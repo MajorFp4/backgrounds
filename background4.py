@@ -72,10 +72,10 @@ def abrir_janela_edicao_g1():
         
         cor_preview_local.config(bg=nova_cor)
         
-        hex_var.trace_vdelete("w", hex_trace_id)
+        hex_var.trace_remove("write", hex_trace_id)
         hex_entry.delete(0, tk.END)
         hex_entry.insert(0, nova_cor)
-        hex_var.trace_add("w", validar_hex_entry)
+        hex_var.trace_add("write", validar_hex_entry)
         
         preview_g1_colorido = carregar_g1_colorido(
             PRESETS[preset_atual]["code"],
@@ -132,7 +132,7 @@ def abrir_janela_edicao_g1():
     hex_var = tk.StringVar(value=cor_atual)
     hex_entry = tk.Entry(top_frame, textvariable=hex_var, width=10)
     hex_entry.pack(side="left")
-    hex_trace_id = hex_var.trace_add("w", validar_hex_entry)
+    hex_trace_id = hex_var.trace_add("write", validar_hex_entry)
 
     preview_frame = tk.Frame(editor_g1_window, relief="sunken", bd=2)
     preview_frame.pack(fill="both", expand=True, padx=10, pady=5)
@@ -348,27 +348,25 @@ def criar_botao_com_icone(master, icon_image_tk, background_image_tk=None, backg
     - Se 'background_image_tk' for fornecido, usa como fundo (para transparência).
     - Se 'background_color' for fornecido, usa como uma cor de fundo sólida.
     """
-    # Cria o canvas. Define uma cor de fundo inicial que será sobreposta.
     btn = tk.Canvas(master, width=size, height=size, highlightthickness=0, bd=0)
     
-    # Define o fundo do botão
     if background_image_tk:
-        # Usa uma imagem como fundo
         btn.create_image(0, 0, image=background_image_tk, anchor="nw")
     elif background_color:
-        # Usa uma cor sólida como fundo
         btn.config(bg=background_color)
 
-    # Desenha o ícone principal por cima do fundo
     if icon_image_tk:
         btn.create_image(size/2, size/2, image=icon_image_tk)
 
-    # O overlay para o efeito de hover continua funcionando por cima de tudo
     overlay = btn.create_rectangle(0, 0, size, size, fill='', outline='')
 
     def on_enter(event):
-        btn.itemconfig(overlay, fill='#00000040')
+        # Aplica um preenchimento preto com um padrão de 50% de cinza
+        btn.itemconfig(overlay, fill='black', stipple='gray50')
+    
+    # --- CORREÇÃO APLICADA AQUI ---
     def on_leave(event):
+        # Simplesmente remove o preenchimento. O stipple é ignorado.
         btn.itemconfig(overlay, fill='')
     
     btn.bind("<Enter>", on_enter)
