@@ -148,113 +148,6 @@ def abrir_janela_edicao_g1():
 
     logger.log(f"Janela de edição de cor aberta para o preset '{preset_atual}'.")
 
-def abrir_janela_edicao_g1():
-    """
-    Abre uma janela personalizada para editar a cor da imagem de fundo g1.png.
-    VERSÃO CORRIGIDA.
-    """
-    preset_atual = preset_var.get()
-    if preset_atual not in PRESETS:
-        return
-
-    editor_g1_window = tk.Toplevel(janela)
-    editor_g1_window.title(f"Editando Cor de Fundo - {preset_atual}")
-    editor_g1_window.geometry("800x800")
-    editor_g1_window.transient(janela)
-    editor_g1_window.grab_set()
-
-    # Variável para guardar o ID do item de imagem no canvas
-    canvas_image_id = None
-
-    def validar_e_salvar_cor_hex(cor_hex):
-        if re.match(r'^#[0-9a-fA-F]{6}$', cor_hex):
-            PRESETS[preset_atual]["color"] = cor_hex
-            salvar_presets(PRESETS, DATA_FILE)
-            logger.log(f"Cor do preset '{preset_atual}' atualizada para {cor_hex} via entrada de texto.")
-            return True
-        return False
-
-    def atualizar_controles_cor(nova_cor):
-        nonlocal canvas_image_id
-        
-        cor_preview_local.config(bg=nova_cor)
-        
-        hex_var.trace_vdelete("w", hex_trace_id)
-        hex_entry.delete(0, tk.END)
-        hex_entry.insert(0, nova_cor)
-        hex_var.trace_add("w", validar_hex_entry)
-        
-        preview_g1_colorido = carregar_g1_colorido(
-            PRESETS[preset_atual]["code"],
-            nova_cor,
-            BASE_DIR
-        )
-        if preview_g1_colorido:
-            img_tk = ImageTk.PhotoImage(preview_g1_colorido.resize((400, 263)))
-            
-            # --- MELHORIA APLICADA AQUI ---
-            # Se já existir uma imagem no canvas, apague-a antes de desenhar a nova.
-            if canvas_image_id:
-                canvas_preview.delete(canvas_image_id)
-            
-            canvas_image_id = canvas_preview.create_image(200, 131, image=img_tk, anchor="center") # Centralizado
-            canvas_preview.image = img_tk
-
-    def escolher_nova_cor_dialogo():
-        cor_rgb, cor_hex = colorchooser.askcolor(title="Escolha uma cor")
-        if cor_hex:
-            if validar_e_salvar_cor_hex(cor_hex):
-                atualizar_controles_cor(cor_hex)
-
-    def validar_hex_entry(*args):
-        """Função chamada toda vez que o texto na caixa de entrada muda."""
-        cor_inserida = hex_var.get()
-        # --- CORREÇÃO PRINCIPAL APLICADA AQUI ---
-        # Agora, se a cor for válida, chamamos a função principal de atualização
-        # que atualiza TUDO (quadrado, texto e o preview grande).
-        if validar_e_salvar_cor_hex(cor_inserida):
-            atualizar_controles_cor(cor_inserida)
-    
-    def aplicar_e_fechar():
-        cor_final = hex_var.get()
-        if validar_e_salvar_cor_hex(cor_final):
-            logger.log(f"Edição de cor para '{preset_atual}' finalizada.")
-            editor_g1_window.destroy()
-            mudar_preset()
-        else:
-            messagebox.showwarning("Cor Inválida", "A cor inserida não é um código hexadecimal válido (ex: #1A2B3C).")
-
-    # --- Widgets da Janela de Edição (sem alteração) ---
-    
-    top_frame = tk.Frame(editor_g1_window)
-    top_frame.pack(side="top", fill="x", padx=10, pady=10)
-
-    btn_escolher_cor = tk.Button(top_frame, text="Escolher cor", command=escolher_nova_cor_dialogo)
-    btn_escolher_cor.pack(side="left")
-
-    cor_atual = PRESETS[preset_atual]["color"]
-    cor_preview_local = tk.Label(top_frame, bg=cor_atual, relief="solid", bd=1, width=4)
-    cor_preview_local.pack(side="left", padx=5)
-
-    hex_var = tk.StringVar(value=cor_atual)
-    hex_entry = tk.Entry(top_frame, textvariable=hex_var, width=10)
-    hex_entry.pack(side="left")
-    hex_trace_id = hex_var.trace_add("w", validar_hex_entry)
-
-    preview_frame = tk.Frame(editor_g1_window, relief="sunken", bd=2)
-    preview_frame.pack(fill="both", expand=True, padx=10, pady=5)
-    canvas_preview = tk.Canvas(preview_frame, bg="gray")
-    # Bind para recalcular o centro da imagem se a janela for redimensionada
-    canvas_preview.bind("<Configure>", lambda e: atualizar_controles_cor(hex_var.get()))
-    canvas_preview.pack(fill="both", expand=True)
-
-    btn_aplicar = tk.Button(editor_g1_window, text="Aplicar e Fechar", command=aplicar_e_fechar)
-    btn_aplicar.pack(side="right", padx=10, pady=10)
-    
-    atualizar_controles_cor(cor_atual)
-
-    logger.log(f"Janela de edição de cor aberta para o preset '{preset_atual}'.")
-
 def excluir_preset_selecionado():
     """
     Exclui o preset atualmente selecionado no combobox, incluindo sua pasta de imagens.
@@ -484,6 +377,57 @@ def criar_botao_com_icone(master, icon_image_tk, background_image_tk=None, backg
         btn.bind("<Button-1>", lambda e: command())
         
     return btn
+
+def abrir_janela_adicionar_imagem():
+    """
+    Abre uma janela para o usuário selecionar um novo arquivo de imagem
+    e adicioná-lo ao preset atual.
+    """
+    preset_atual = preset_var.get()
+    if not preset_atual or preset_atual == "Novo preset":
+        messagebox.showwarning("Ação Inválida", "Selecione um preset válido antes de adicionar uma imagem.")
+        return
+
+    # Abre o diálogo para escolher um arquivo
+    novo_caminho = filedialog.askopenfilename(
+        title="Escolha a nova imagem para adicionar",
+        filetypes=[("Imagens", "*.png *.jpg *.jpeg *.bmp *.gif"), ("Todos os arquivos", "*.*")]
+    )
+
+    if not novo_caminho:
+        logger.log("Adição de nova imagem cancelada.")
+        return
+
+    try:
+        # Define a pasta de destino
+        codigo_preset = PRESETS[preset_atual]["code"]
+        pasta_destino = os.path.join(BASE_DIR, codigo_preset)
+        
+        # Pega o nome do novo arquivo sem a extensão
+        nome_novo_arquivo_sem_ext = os.path.splitext(os.path.basename(novo_caminho))[0]
+        
+        # Monta o caminho final, garantindo a extensão .png
+        caminho_final = os.path.join(pasta_destino, f"{nome_novo_arquivo_sem_ext}.png")
+        
+        # Verifica se um arquivo com esse nome já existe
+        if os.path.exists(caminho_final):
+            if not messagebox.askyesno("Arquivo Existente", "Uma imagem com este nome já existe no preset. Deseja substituí-la?"):
+                logger.log("Substituição de imagem existente cancelada.")
+                return
+        
+        # Abre a imagem selecionada e a salva como PNG no destino
+        imagem_para_adicionar = Image.open(novo_caminho)
+        imagem_para_adicionar.save(caminho_final, "PNG")
+        
+        logger.log(f"Imagem '{os.path.basename(caminho_final)}' adicionada ao preset '{preset_atual}'.")
+        messagebox.showinfo("Sucesso", "Nova imagem adicionada com sucesso!")
+        
+        # Atualiza a galeria para mostrar a nova imagem
+        mudar_preset()
+
+    except Exception as e:
+        messagebox.showerror("Erro ao Adicionar Imagem", f"Ocorreu um erro: {e}")
+        logger.log(f"ERRO ao adicionar nova imagem: {e}")
 
 def atualizar_galeria(imagens):
     for widget in galeria_inner.winfo_children():
