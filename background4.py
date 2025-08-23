@@ -3,6 +3,7 @@ import re
 import json
 import shutil
 import tkinter as tk
+import math
 from tkinter import ttk, colorchooser, IntVar, simpledialog, messagebox, filedialog
 from PIL import Image, ImageTk
 from logger import Logger
@@ -44,18 +45,18 @@ imagens_atuais = []
 def abrir_janela_edicao_g1():
     """
     Abre uma janela personalizada para editar a cor da imagem de fundo g1.png.
-    VERSÃO COM REDIMENSIONAMENTO PROPORCIONAL FORÇADO.
+    VERSÃO COM TAMANHO DINÂMICO E PROPORCIONAL.
     """
     preset_atual = preset_var.get()
     if preset_atual not in PRESETS:
         return
 
+    # --- NOVO: LÓGICA PARA CALCULAR TAMANHO DA JANELA ---
     try:
+        # Carrega a imagem g1 original para obter suas dimensões
         caminho_g1_original = os.path.join(BASE_DIR, PRESETS[preset_atual]["code"], "g1.png")
         imagem_g1_pil = Image.open(caminho_g1_original)
         img_w, img_h = imagem_g1_pil.size
-        
-        # A proporção da ÁREA DE IMAGEM (largura / altura)
         img_aspect_ratio = img_w / img_h
     except FileNotFoundError:
         messagebox.showerror("Erro", "Não foi possível encontrar o arquivo g1.png para este preset.")
@@ -63,69 +64,47 @@ def abrir_janela_edicao_g1():
 
     editor_g1_window = tk.Toplevel(janela)
     editor_g1_window.title(f"Editando Cor de Fundo - {preset_atual}")
-
-    # Estima o espaço ocupado pelos widgets que NÃO são a imagem (barras, botões, etc.)
-    CHROME_WIDTH = 40  # Padding horizontal
-    CHROME_HEIGHT = 150 # Padding vertical + controles
-
-    # --- CÁLCULO DO TAMANHO INICIAL ---
+    
+    # --- NOVO: CÁLCULO DO TAMANHO MÁXIMO E INICIAL ---
+    # Pega o tamanho da tela e define um limite (90% da altura e largura)
     screen_w = editor_g1_window.winfo_screenwidth()
     screen_h = editor_g1_window.winfo_screenheight()
     max_win_w = int(screen_w * 0.9)
     max_win_h = int(screen_h * 0.9)
 
-    window_h = min(img_h + CHROME_HEIGHT, max_win_h)
-    window_w = int(((window_h - CHROME_HEIGHT) * img_aspect_ratio) + CHROME_WIDTH)
+    # Estima o espaço vertical ocupado pelos controles (topo e rodapé)
+    chrome_height = 150 
+    
+    # Calcula a altura ideal da janela baseada na altura máxima permitida
+    window_h = min(img_h + chrome_height, max_win_h)
+    
+    # Com a altura da janela, calcula a largura proporcional
+    preview_h = window_h - chrome_height
+    preview_w = preview_h * img_aspect_ratio
+    window_w = int(preview_w + 40) # Adiciona padding horizontal
 
+    # Se a largura calculada exceder o máximo, recalcula tudo baseado na largura
     if window_w > max_win_w:
         window_w = max_win_w
-        window_h = int(((window_w - CHROME_WIDTH) / img_aspect_ratio) + CHROME_HEIGHT)
+        preview_w = window_w - 40
+        preview_h = preview_w / img_aspect_ratio
+        window_h = int(preview_h + chrome_height)
 
-    editor_g1_window.minsize(400, int(360 / img_aspect_ratio + CHROME_HEIGHT))
+    # Define o tamanho mínimo e o tamanho inicial da janela
+    editor_g1_window.minsize(400, 300)
     editor_g1_window.geometry(f"{window_w}x{window_h}")
 
     editor_g1_window.transient(janela)
     editor_g1_window.grab_set()
 
-    # --- NOVA LÓGICA PARA FORÇAR A PROPORÇÃO ---
-    
-    # Guarda o último tamanho conhecido para evitar loops infinitos de redimensionamento
-    last_known_size = {'w': window_w, 'h': window_h}
-
-    def _enforce_aspect_ratio(event):
-        # Ignora o primeiro evento de configuração que apenas posiciona a janela
-        if event.width == 1 and event.height == 1:
-            return
-
-        new_w, new_h = event.width, event.height
-        last_w, last_h = last_known_size['w'], last_known_size['h']
-
-        # Se o tamanho não mudou, ou se o evento foi acionado pelo nosso próprio código, ignora
-        if new_w == last_w and new_h == last_h:
-            return
-
-        # Determina se o usuário mudou a largura ou a altura
-        if new_w != last_w: # Usuário arrastou a largura
-            # Calcula a nova altura baseada na nova largura
-            new_h = int(((new_w - CHROME_WIDTH) / img_aspect_ratio) + CHROME_HEIGHT)
-        else: # Usuário arrastou a altura
-            # Calcula a nova largura baseada na nova altura
-            new_w = int(((new_h - CHROME_HEIGHT) * img_aspect_ratio) + CHROME_WIDTH)
-
-        # Aplica o novo tamanho calculado e proporcional
-        editor_g1_window.geometry(f"{new_w}x{new_h}")
-        # Atualiza o último tamanho conhecido para o novo tamanho que acabamos de definir
-        last_known_size['w'], last_known_size['h'] = new_w, new_h
-
-    # Vincula a função ao evento de redimensionamento da janela
-    editor_g1_window.bind("<Configure>", _enforce_aspect_ratio)
-
-    # --- O RESTANTE DA FUNÇÃO CONTINUA PRATICAMENTE IGUAL ---
-
     canvas_image_id = None
 
+    # --- FUNÇÃO DE ATUALIZAÇÃO DO PREVIEW (MODIFICADA) ---
     def update_g1_preview(cor_valida):
+        """Atualiza o canvas mantendo a proporção da imagem original."""
         nonlocal canvas_image_id
+        
+        # Gera a imagem colorida
         preview_g1_colorido = carregar_g1_colorido(
             PRESETS[preset_atual]["code"], cor_valida, BASE_DIR
         )
@@ -134,18 +113,31 @@ def abrir_janela_edicao_g1():
             canvas_h = canvas_preview.winfo_height()
 
             if canvas_w <= 1 or canvas_h <= 1: return
+
+            # --- NOVO: LÓGICA PARA MANTER PROPORÇÃO ---
+            # Compara a proporção do canvas com a da imagem para decidir
+            # se a imagem deve se ajustar à largura ou à altura.
+            if canvas_w / canvas_h > img_aspect_ratio:
+                # O canvas é mais "largo" que a imagem, então a altura é o limitante
+                new_h = canvas_h
+                new_w = int(new_h * img_aspect_ratio)
+            else:
+                # O canvas é mais "alto" (ou igual), então a largura é o limitante
+                new_w = canvas_w
+                new_h = int(new_w / img_aspect_ratio)
             
-            # Como a janela agora tem a proporção correta, a imagem pode simplesmente preencher o canvas
-            img_resized = preview_g1_colorido.resize((canvas_w, canvas_h), Image.Resampling.LANCZOS)
+            img_resized = preview_g1_colorido.resize((new_w, new_h), Image.Resampling.LANCZOS)
             img_tk = ImageTk.PhotoImage(img_resized)
             
             if canvas_image_id:
                 canvas_preview.delete(canvas_image_id)
             
-            canvas_image_id = canvas_preview.create_image(0, 0, image=img_tk, anchor="nw")
+            # Centraliza a imagem no canvas
+            canvas_image_id = canvas_preview.create_image(canvas_w/2, canvas_h/2, image=img_tk, anchor="center")
             canvas_preview.image = img_tk
 
     # ... (O restante da função: on_hex_var_change, escolher_nova_cor_dialogo, etc., continua IGUAL) ...
+    # ... (A criação dos widgets também continua IGUAL) ...
     def on_hex_var_change(*args):
         cor_inserida = hex_var.get()
         if re.match(r'^#[0-9a-fA-F]{6}$', cor_inserida):
@@ -172,23 +164,29 @@ def abrir_janela_edicao_g1():
 
     top_frame = tk.Frame(editor_g1_window)
     top_frame.pack(side="top", fill="x", padx=10, pady=10)
+
     btn_escolher_cor = tk.Button(top_frame, text="Escolher cor", command=escolher_nova_cor_dialogo)
     btn_escolher_cor.pack(side="left")
+
     cor_atual = PRESETS[preset_atual]["color"]
     cor_preview_local = tk.Label(top_frame, bg=cor_atual, relief="solid", bd=1, width=4)
     cor_preview_local.pack(side="left", padx=5)
+
     hex_var = tk.StringVar(value=cor_atual)
     hex_entry = tk.Entry(top_frame, textvariable=hex_var, width=10)
     hex_entry.pack(side="left")
+
     hex_var.trace_add("write", on_hex_var_change)
+
     preview_frame = tk.Frame(editor_g1_window, relief="sunken", bd=2)
     preview_frame.pack(fill="both", expand=True, padx=10, pady=5)
     canvas_preview = tk.Canvas(preview_frame, bg="gray")
-    # O bind do canvas agora só precisa redesenhar a imagem, sem se preocupar com a proporção
     canvas_preview.bind("<Configure>", lambda e: update_g1_preview(hex_var.get()))
     canvas_preview.pack(fill="both", expand=True)
+
     btn_aplicar = tk.Button(editor_g1_window, text="Aplicar e Fechar", command=aplicar_e_fechar)
     btn_aplicar.pack(side="right", padx=10, pady=10)
+    
     logger.log(f"Janela de edição de cor aberta para o preset '{preset_atual}'.")
 
 def excluir_preset_selecionado():
