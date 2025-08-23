@@ -1,0 +1,3 @@
+[2025-08-23 09:30:08] --- Sessão de log iniciada ---
+[2025-08-23 09:30:08] Preset alterado para: 'standard'.
+[2025-08-23 09:30:12] --- Sessão encerrada pelo usuário. Salvando logs finais. ---

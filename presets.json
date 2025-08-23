@@ -1,0 +1,12 @@
+{
+    "standard": {
+        "code": "standard",
+        "color": "#8000ff",
+        "mostrar_fundo": true
+    },
+    "test": {
+        "code": "JZLKNG",
+        "color": "#d200d2",
+        "mostrar_fundo": true
+    }
+}
