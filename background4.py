@@ -44,65 +44,115 @@ imagens_atuais = []
 def abrir_janela_edicao_g1():
     """
     Abre uma janela personalizada para editar a cor da imagem de fundo g1.png.
-    VERSÃO CORRIGIDA E ROBUSTA.
+    VERSÃO COM TAMANHO DINÂMICO E PROPORCIONAL.
     """
     preset_atual = preset_var.get()
     if preset_atual not in PRESETS:
         return
 
+    # --- NOVO: LÓGICA PARA CALCULAR TAMANHO DA JANELA ---
+    try:
+        # Carrega a imagem g1 original para obter suas dimensões
+        caminho_g1_original = os.path.join(BASE_DIR, PRESETS[preset_atual]["code"], "g1.png")
+        imagem_g1_pil = Image.open(caminho_g1_original)
+        img_w, img_h = imagem_g1_pil.size
+        img_aspect_ratio = img_w / img_h
+    except FileNotFoundError:
+        messagebox.showerror("Erro", "Não foi possível encontrar o arquivo g1.png para este preset.")
+        return
+
     editor_g1_window = tk.Toplevel(janela)
     editor_g1_window.title(f"Editando Cor de Fundo - {preset_atual}")
-    editor_g1_window.geometry("800x800")
+    
+    # --- NOVO: CÁLCULO DO TAMANHO MÁXIMO E INICIAL ---
+    # Pega o tamanho da tela e define um limite (90% da altura e largura)
+    screen_w = editor_g1_window.winfo_screenwidth()
+    screen_h = editor_g1_window.winfo_screenheight()
+    max_win_w = int(screen_w * 0.9)
+    max_win_h = int(screen_h * 0.9)
+
+    # Estima o espaço vertical ocupado pelos controles (topo e rodapé)
+    chrome_height = 150 
+    
+    # Calcula a altura ideal da janela baseada na altura máxima permitida
+    window_h = min(img_h + chrome_height, max_win_h)
+    
+    # Com a altura da janela, calcula a largura proporcional
+    preview_h = window_h - chrome_height
+    preview_w = preview_h * img_aspect_ratio
+    window_w = int(preview_w + 40) # Adiciona padding horizontal
+
+    # Se a largura calculada exceder o máximo, recalcula tudo baseado na largura
+    if window_w > max_win_w:
+        window_w = max_win_w
+        preview_w = window_w - 40
+        preview_h = preview_w / img_aspect_ratio
+        window_h = int(preview_h + chrome_height)
+
+    # Define o tamanho mínimo e o tamanho inicial da janela
+    editor_g1_window.minsize(400, 300)
+    editor_g1_window.geometry(f"{window_w}x{window_h}")
+
     editor_g1_window.transient(janela)
     editor_g1_window.grab_set()
 
     canvas_image_id = None
 
+    # --- FUNÇÃO DE ATUALIZAÇÃO DO PREVIEW (MODIFICADA) ---
     def update_g1_preview(cor_valida):
-        """Atualiza apenas o canvas com a imagem g1 colorida."""
+        """Atualiza o canvas mantendo a proporção da imagem original."""
         nonlocal canvas_image_id
+        
+        # Gera a imagem colorida
         preview_g1_colorido = carregar_g1_colorido(
             PRESETS[preset_atual]["code"], cor_valida, BASE_DIR
         )
         if preview_g1_colorido:
-            # Redimensiona a imagem para caber no canvas
             canvas_w = canvas_preview.winfo_width()
             canvas_h = canvas_preview.winfo_height()
-            if canvas_w > 1 and canvas_h > 1: # Garante que o canvas já tenha um tamanho
-                img_resized = preview_g1_colorido.resize((canvas_w, canvas_h), Image.Resampling.LANCZOS)
-                img_tk = ImageTk.PhotoImage(img_resized)
-                
-                if canvas_image_id:
-                    canvas_preview.delete(canvas_image_id)
-                
-                canvas_image_id = canvas_preview.create_image(0, 0, image=img_tk, anchor="nw")
-                canvas_preview.image = img_tk
 
+            if canvas_w <= 1 or canvas_h <= 1: return
+
+            # --- NOVO: LÓGICA PARA MANTER PROPORÇÃO ---
+            # Compara a proporção do canvas com a da imagem para decidir
+            # se a imagem deve se ajustar à largura ou à altura.
+            if canvas_w / canvas_h > img_aspect_ratio:
+                # O canvas é mais "largo" que a imagem, então a altura é o limitante
+                new_h = canvas_h
+                new_w = int(new_h * img_aspect_ratio)
+            else:
+                # O canvas é mais "alto" (ou igual), então a largura é o limitante
+                new_w = canvas_w
+                new_h = int(new_w / img_aspect_ratio)
+            
+            img_resized = preview_g1_colorido.resize((new_w, new_h), Image.Resampling.LANCZOS)
+            img_tk = ImageTk.PhotoImage(img_resized)
+            
+            if canvas_image_id:
+                canvas_preview.delete(canvas_image_id)
+            
+            # Centraliza a imagem no canvas
+            canvas_image_id = canvas_preview.create_image(canvas_w/2, canvas_h/2, image=img_tk, anchor="center")
+            canvas_preview.image = img_tk
+
+    # ... (O restante da função: on_hex_var_change, escolher_nova_cor_dialogo, etc., continua IGUAL) ...
+    # ... (A criação dos widgets também continua IGUAL) ...
     def on_hex_var_change(*args):
-        """
-        Função central chamada sempre que a cor na StringVar muda.
-        Valida a cor e atualiza os previews.
-        """
         cor_inserida = hex_var.get()
         if re.match(r'^#[0-9a-fA-F]{6}$', cor_inserida):
-            # Se a cor for válida, atualiza tudo
             cor_preview_local.config(bg=cor_inserida)
             update_g1_preview(cor_inserida)
-            # Salva a nova cor válida
             if PRESETS[preset_atual]["color"] != cor_inserida:
                 PRESETS[preset_atual]["color"] = cor_inserida
                 salvar_presets(PRESETS, DATA_FILE)
                 logger.log(f"Cor do preset '{preset_atual}' atualizada para {cor_inserida}.")
 
     def escolher_nova_cor_dialogo():
-        """Abre o seletor de cores e atualiza a StringVar, que aciona o resto."""
         cor_rgb, cor_hex = colorchooser.askcolor(title="Escolha uma cor")
         if cor_hex:
-            # Apenas muda o valor da StringVar. O 'trace' fará o resto.
             hex_var.set(cor_hex)
     
     def aplicar_e_fechar():
-        """Verifica a cor final, fecha a janela e atualiza a galeria principal."""
         cor_final = hex_var.get()
         if re.match(r'^#[0-9a-fA-F]{6}$', cor_final):
             logger.log(f"Edição de cor para '{preset_atual}' finalizada.")
@@ -111,8 +161,6 @@ def abrir_janela_edicao_g1():
         else:
             messagebox.showwarning("Cor Inválida", "A cor final inserida não é um código hexadecimal válido (ex: #1A2B3C).")
 
-    # --- Widgets da Janela de Edição ---
-    
     top_frame = tk.Frame(editor_g1_window)
     top_frame.pack(side="top", fill="x", padx=10, pady=10)
 
@@ -127,13 +175,11 @@ def abrir_janela_edicao_g1():
     hex_entry = tk.Entry(top_frame, textvariable=hex_var, width=10)
     hex_entry.pack(side="left")
 
-    # Adiciona o 'trace' UMA VEZ. Ele agora chama a função central 'on_hex_var_change'.
     hex_var.trace_add("write", on_hex_var_change)
 
     preview_frame = tk.Frame(editor_g1_window, relief="sunken", bd=2)
     preview_frame.pack(fill="both", expand=True, padx=10, pady=5)
     canvas_preview = tk.Canvas(preview_frame, bg="gray")
-    # O evento de redimensionamento agora chama a função de atualizar o preview diretamente
     canvas_preview.bind("<Configure>", lambda e: update_g1_preview(hex_var.get()))
     canvas_preview.pack(fill="both", expand=True)
 

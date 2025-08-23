@@ -1,0 +1,6 @@
+[2025-08-23 15:17:54] --- Sessão de log iniciada ---
+[2025-08-23 15:17:54] Preset alterado para: 'standard'.
+[2025-08-23 15:17:56] Janela de edição de cor aberta para o preset 'standard'.
+[2025-08-23 15:19:01] Edição de cor para 'standard' finalizada.
+[2025-08-23 15:19:01] Preset alterado para: 'standard'.
+[2025-08-23 15:19:02] --- Sessão encerrada pelo usuário. Salvando logs finais. ---
