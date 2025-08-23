@@ -44,7 +44,7 @@ imagens_atuais = []
 def abrir_janela_edicao_g1():
     """
     Abre uma janela personalizada para editar a cor da imagem de fundo g1.png.
-    VERSÃO CORRIGIDA.
+    VERSÃO CORRIGIDA E ROBUSTA.
     """
     preset_atual = preset_var.get()
     if preset_atual not in PRESETS:
@@ -56,68 +56,62 @@ def abrir_janela_edicao_g1():
     editor_g1_window.transient(janela)
     editor_g1_window.grab_set()
 
-    # Variável para guardar o ID do item de imagem no canvas
     canvas_image_id = None
 
-    def validar_e_salvar_cor_hex(cor_hex):
-        if re.match(r'^#[0-9a-fA-F]{6}$', cor_hex):
-            PRESETS[preset_atual]["color"] = cor_hex
-            salvar_presets(PRESETS, DATA_FILE)
-            logger.log(f"Cor do preset '{preset_atual}' atualizada para {cor_hex} via entrada de texto.")
-            return True
-        return False
-
-    def atualizar_controles_cor(nova_cor):
+    def update_g1_preview(cor_valida):
+        """Atualiza apenas o canvas com a imagem g1 colorida."""
         nonlocal canvas_image_id
-        
-        cor_preview_local.config(bg=nova_cor)
-        
-        hex_var.trace_remove("write", hex_trace_id)
-        hex_entry.delete(0, tk.END)
-        hex_entry.insert(0, nova_cor)
-        hex_var.trace_add("write", validar_hex_entry)
-        
         preview_g1_colorido = carregar_g1_colorido(
-            PRESETS[preset_atual]["code"],
-            nova_cor,
-            BASE_DIR
+            PRESETS[preset_atual]["code"], cor_valida, BASE_DIR
         )
         if preview_g1_colorido:
-            img_tk = ImageTk.PhotoImage(preview_g1_colorido.resize((400, 263)))
-            
-            # --- MELHORIA APLICADA AQUI ---
-            # Se já existir uma imagem no canvas, apague-a antes de desenhar a nova.
-            if canvas_image_id:
-                canvas_preview.delete(canvas_image_id)
-            
-            canvas_image_id = canvas_preview.create_image(200, 131, image=img_tk, anchor="center") # Centralizado
-            canvas_preview.image = img_tk
+            # Redimensiona a imagem para caber no canvas
+            canvas_w = canvas_preview.winfo_width()
+            canvas_h = canvas_preview.winfo_height()
+            if canvas_w > 1 and canvas_h > 1: # Garante que o canvas já tenha um tamanho
+                img_resized = preview_g1_colorido.resize((canvas_w, canvas_h), Image.Resampling.LANCZOS)
+                img_tk = ImageTk.PhotoImage(img_resized)
+                
+                if canvas_image_id:
+                    canvas_preview.delete(canvas_image_id)
+                
+                canvas_image_id = canvas_preview.create_image(0, 0, image=img_tk, anchor="nw")
+                canvas_preview.image = img_tk
+
+    def on_hex_var_change(*args):
+        """
+        Função central chamada sempre que a cor na StringVar muda.
+        Valida a cor e atualiza os previews.
+        """
+        cor_inserida = hex_var.get()
+        if re.match(r'^#[0-9a-fA-F]{6}$', cor_inserida):
+            # Se a cor for válida, atualiza tudo
+            cor_preview_local.config(bg=cor_inserida)
+            update_g1_preview(cor_inserida)
+            # Salva a nova cor válida
+            if PRESETS[preset_atual]["color"] != cor_inserida:
+                PRESETS[preset_atual]["color"] = cor_inserida
+                salvar_presets(PRESETS, DATA_FILE)
+                logger.log(f"Cor do preset '{preset_atual}' atualizada para {cor_inserida}.")
 
     def escolher_nova_cor_dialogo():
+        """Abre o seletor de cores e atualiza a StringVar, que aciona o resto."""
         cor_rgb, cor_hex = colorchooser.askcolor(title="Escolha uma cor")
         if cor_hex:
-            if validar_e_salvar_cor_hex(cor_hex):
-                atualizar_controles_cor(cor_hex)
-
-    def validar_hex_entry(*args):
-        """Função chamada toda vez que o texto na caixa de entrada muda."""
-        cor_inserida = hex_var.get()
-        # --- CORREÇÃO PRINCIPAL APLICADA AQUI ---
-        # Agora, se a cor for válida, chamamos a função principal de atualização
-        # que atualiza TUDO (quadrado, texto e o preview grande).
-        if validar_e_salvar_cor_hex(cor_inserida):
-            atualizar_controles_cor(cor_inserida)
+            # Apenas muda o valor da StringVar. O 'trace' fará o resto.
+            hex_var.set(cor_hex)
     
     def aplicar_e_fechar():
+        """Verifica a cor final, fecha a janela e atualiza a galeria principal."""
         cor_final = hex_var.get()
-        if validar_e_salvar_cor_hex(cor_final):
+        if re.match(r'^#[0-9a-fA-F]{6}$', cor_final):
             logger.log(f"Edição de cor para '{preset_atual}' finalizada.")
             editor_g1_window.destroy()
             mudar_preset()
         else:
-            messagebox.showwarning("Cor Inválida", "A cor inserida não é um código hexadecimal válido (ex: #1A2B3C).")
+            messagebox.showwarning("Cor Inválida", "A cor final inserida não é um código hexadecimal válido (ex: #1A2B3C).")
 
-    # --- Widgets da Janela de Edição (sem alteração) ---
+    # --- Widgets da Janela de Edição ---
     
     top_frame = tk.Frame(editor_g1_window)
     top_frame.pack(side="top", fill="x", padx=10, pady=10)
@@ -132,20 +126,20 @@ def abrir_janela_edicao_g1():
     hex_var = tk.StringVar(value=cor_atual)
     hex_entry = tk.Entry(top_frame, textvariable=hex_var, width=10)
     hex_entry.pack(side="left")
-    hex_trace_id = hex_var.trace_add("write", validar_hex_entry)
+
+    # Adiciona o 'trace' UMA VEZ. Ele agora chama a função central 'on_hex_var_change'.
+    hex_var.trace_add("write", on_hex_var_change)
 
     preview_frame = tk.Frame(editor_g1_window, relief="sunken", bd=2)
     preview_frame.pack(fill="both", expand=True, padx=10, pady=5)
     canvas_preview = tk.Canvas(preview_frame, bg="gray")
-    # Bind para recalcular o centro da imagem se a janela for redimensionada
-    canvas_preview.bind("<Configure>", lambda e: atualizar_controles_cor(hex_var.get()))
+    # O evento de redimensionamento agora chama a função de atualizar o preview diretamente
+    canvas_preview.bind("<Configure>", lambda e: update_g1_preview(hex_var.get()))
     canvas_preview.pack(fill="both", expand=True)
 
     btn_aplicar = tk.Button(editor_g1_window, text="Aplicar e Fechar", command=aplicar_e_fechar)
     btn_aplicar.pack(side="right", padx=10, pady=10)
     
-    atualizar_controles_cor(cor_atual)
-
     logger.log(f"Janela de edição de cor aberta para o preset '{preset_atual}'.")
 
 def excluir_preset_selecionado():

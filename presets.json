@@ -1,7 +1,7 @@
 {
     "standard": {
         "code": "standard",
-        "color": "#8000ff",
+        "color": "#000080",
         "mostrar_fundo": true
     },
     "test": {
