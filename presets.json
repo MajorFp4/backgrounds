@@ -1,12 +1,22 @@
 {
     "standard": {
         "code": "standard",
-        "color": "#ff80ff",
+        "color": "#80ffff",
         "mostrar_fundo": true
     },
     "test": {
         "code": "JZLKNG",
         "color": "#d200d2",
+        "mostrar_fundo": true
+    },
+    "azur": {
+        "code": "1AHTBL",
+        "color": "#99ff00",
+        "mostrar_fundo": true
+    },
+    "Vermeio": {
+        "code": "M3TFQ8",
+        "color": "#6c0000",
         "mostrar_fundo": true
     }
 }

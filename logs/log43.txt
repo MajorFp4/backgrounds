@@ -1,0 +1,8 @@
+[2025-08-24 20:25:55] --- Sessão de log iniciada ---
+[2025-08-24 20:25:57] Preset alterado para: 'standard'.
+[2025-08-24 20:26:08] Janela de edição aberta para o arquivo 'Demóstenes Neves.png'.
+[2025-08-24 20:26:31] Nova imagem 'Unciv files.png' selecionada para substituir 'Demóstenes Neves.png'.
+[2025-08-24 20:27:21] Nova imagem 'Demóstenes Neves.png' selecionada para substituir 'Demóstenes Neves.png'.
+[2025-08-24 20:27:25] Nova imagem salva como 'Demóstenes Neves.png'.
+[2025-08-24 20:27:26] Preset alterado para: 'standard'.
+[2025-08-24 20:30:11] --- Sessão encerrada pelo usuário. Salvando logs finais. ---

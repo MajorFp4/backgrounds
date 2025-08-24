@@ -5,7 +5,7 @@ import shutil
 import tkinter as tk
 import math
 from tkinter import ttk, colorchooser, IntVar, simpledialog, messagebox, filedialog
-from PIL import Image, ImageTk
+from PIL import Image, ImageTk, ImageOps
 from logger import Logger
 from functions import (
     gerar_codigo,
@@ -44,17 +44,16 @@ imagens_atuais = []
 
 def abrir_janela_edicao_g1():
     """
-    Abre uma janela personalizada para editar a cor da imagem de fundo g1.png.
-    VERSÃO COM TAMANHO DINÂMICO E PROPORCIONAL.
+    Abre uma janela personalizada para editar a cor e substituir a imagem de fundo g1.png.
+    VERSÃO FINAL com todas as funcionalidades.
     """
     preset_atual = preset_var.get()
     if preset_atual not in PRESETS:
         return
 
-    # --- NOVO: LÓGICA PARA CALCULAR TAMANHO DA JANELA ---
+    caminho_g1_original = os.path.join(BASE_DIR, PRESETS[preset_atual]["code"], "g1.png")
+
     try:
-        # Carrega a imagem g1 original para obter suas dimensões
-        caminho_g1_original = os.path.join(BASE_DIR, PRESETS[preset_atual]["code"], "g1.png")
         imagem_g1_pil = Image.open(caminho_g1_original)
         img_w, img_h = imagem_g1_pil.size
         img_aspect_ratio = img_w / img_h
@@ -63,130 +62,160 @@ def abrir_janela_edicao_g1():
         return
 
     editor_g1_window = tk.Toplevel(janela)
-    editor_g1_window.title(f"Editando Cor de Fundo - {preset_atual}")
+    editor_g1_window.title(f"Editando Fundo (g1.png) - {preset_atual}")
     
-    # --- NOVO: CÁLCULO DO TAMANHO MÁXIMO E INICIAL ---
-    # Pega o tamanho da tela e define um limite (90% da altura e largura)
+    # Lógica de dimensionamento da janela (mantida da versão anterior)
     screen_w = editor_g1_window.winfo_screenwidth()
     screen_h = editor_g1_window.winfo_screenheight()
     max_win_w = int(screen_w * 0.9)
     max_win_h = int(screen_h * 0.9)
-
-    # Estima o espaço vertical ocupado pelos controles (topo e rodapé)
     chrome_height = 150 
-    
-    # Calcula a altura ideal da janela baseada na altura máxima permitida
     window_h = min(img_h + chrome_height, max_win_h)
-    
-    # Com a altura da janela, calcula a largura proporcional
     preview_h = window_h - chrome_height
     preview_w = preview_h * img_aspect_ratio
-    window_w = int(preview_w + 40) # Adiciona padding horizontal
-
-    # Se a largura calculada exceder o máximo, recalcula tudo baseado na largura
+    window_w = int(preview_w + 40)
     if window_w > max_win_w:
         window_w = max_win_w
         preview_w = window_w - 40
         preview_h = preview_w / img_aspect_ratio
         window_h = int(preview_h + chrome_height)
-
-    # Define o tamanho mínimo e o tamanho inicial da janela
     editor_g1_window.minsize(400, 300)
     editor_g1_window.geometry(f"{window_w}x{window_h}")
-
     editor_g1_window.transient(janela)
     editor_g1_window.grab_set()
 
+    # --- Variáveis de Estado ---
     canvas_image_id = None
+    novo_caminho_selecionado = None # Para guardar o caminho da nova imagem g1
 
-    # --- FUNÇÃO DE ATUALIZAÇÃO DO PREVIEW (MODIFICADA) ---
-    def update_g1_preview(cor_valida):
-        """Atualiza o canvas mantendo a proporção da imagem original."""
+    # --- Funções Internas ---
+
+    def update_g1_preview():
+        """Atualiza o canvas com a imagem (nova ou original) e a cor selecionada."""
         nonlocal canvas_image_id
         
-        # Gera a imagem colorida
-        preview_g1_colorido = carregar_g1_colorido(
-            PRESETS[preset_atual]["code"], cor_valida, BASE_DIR
-        )
-        if preview_g1_colorido:
+        caminho_base = novo_caminho_selecionado if novo_caminho_selecionado else caminho_g1_original
+        cor_atual = hex_var.get()
+
+        try:
+            img_base = Image.open(caminho_base).convert("L")
+            img_colorida = ImageOps.colorize(img_base, black="black", white=cor_atual)
+
             canvas_w = canvas_preview.winfo_width()
             canvas_h = canvas_preview.winfo_height()
-
             if canvas_w <= 1 or canvas_h <= 1: return
 
-            # --- NOVO: LÓGICA PARA MANTER PROPORÇÃO ---
-            # Compara a proporção do canvas com a da imagem para decidir
-            # se a imagem deve se ajustar à largura ou à altura.
-            if canvas_w / canvas_h > img_aspect_ratio:
-                # O canvas é mais "largo" que a imagem, então a altura é o limitante
+            base_w, base_h = img_base.size
+            base_aspect_ratio = base_w / base_h
+            if canvas_w / canvas_h > base_aspect_ratio:
                 new_h = canvas_h
-                new_w = int(new_h * img_aspect_ratio)
+                new_w = int(new_h * base_aspect_ratio)
             else:
-                # O canvas é mais "alto" (ou igual), então a largura é o limitante
                 new_w = canvas_w
-                new_h = int(new_w / img_aspect_ratio)
+                new_h = int(new_w / base_aspect_ratio)
             
-            img_resized = preview_g1_colorido.resize((new_w, new_h), Image.Resampling.LANCZOS)
+            img_resized = img_colorida.resize((new_w, new_h), Image.Resampling.LANCZOS)
             img_tk = ImageTk.PhotoImage(img_resized)
             
             if canvas_image_id:
                 canvas_preview.delete(canvas_image_id)
             
-            # Centraliza a imagem no canvas
             canvas_image_id = canvas_preview.create_image(canvas_w/2, canvas_h/2, image=img_tk, anchor="center")
             canvas_preview.image = img_tk
+        except Exception as e:
+            print(f"Erro ao atualizar preview g1: {e}")
 
-    # ... (O restante da função: on_hex_var_change, escolher_nova_cor_dialogo, etc., continua IGUAL) ...
-    # ... (A criação dos widgets também continua IGUAL) ...
     def on_hex_var_change(*args):
         cor_inserida = hex_var.get()
         if re.match(r'^#[0-9a-fA-F]{6}$', cor_inserida):
             cor_preview_local.config(bg=cor_inserida)
-            update_g1_preview(cor_inserida)
-            if PRESETS[preset_atual]["color"] != cor_inserida:
-                PRESETS[preset_atual]["color"] = cor_inserida
-                salvar_presets(PRESETS, DATA_FILE)
-                logger.log(f"Cor do preset '{preset_atual}' atualizada para {cor_inserida}.")
+            update_g1_preview() # A cor já está na hex_var, que é usada pelo update_g1_preview
 
     def escolher_nova_cor_dialogo():
         cor_rgb, cor_hex = colorchooser.askcolor(title="Escolha uma cor")
         if cor_hex:
             hex_var.set(cor_hex)
-    
+
+    def procurar_nova_imagem_g1():
+        """Procura uma nova imagem para substituir a g1.png."""
+        nonlocal novo_caminho_selecionado
+        caminho = filedialog.askopenfilename(
+            title="Escolha a nova imagem de fundo (g1)",
+            filetypes=[("Imagens", "*.png *.jpg *.jpeg *.bmp *.gif"), ("Todos os arquivos", "*.*")]
+        )
+        if caminho:
+            novo_caminho_selecionado = caminho
+            logger.log(f"Nova imagem '{os.path.basename(caminho)}' selecionada para substituir g1.png.")
+            update_g1_preview()
+
     def aplicar_e_fechar():
         cor_final = hex_var.get()
-        if re.match(r'^#[0-9a-fA-F]{6}$', cor_final):
-            logger.log(f"Edição de cor para '{preset_atual}' finalizada.")
-            editor_g1_window.destroy()
-            mudar_preset()
-        else:
+        if not re.match(r'^#[0-9a-fA-F]{6}$', cor_final):
             messagebox.showwarning("Cor Inválida", "A cor final inserida não é um código hexadecimal válido (ex: #1A2B3C).")
+            return
 
+        # Salva a cor final
+        if PRESETS[preset_atual]["color"] != cor_final:
+            PRESETS[preset_atual]["color"] = cor_final
+            salvar_presets(PRESETS, DATA_FILE)
+            logger.log(f"Cor do preset '{preset_atual}' salva como {cor_final}.")
+
+        # Se uma nova imagem foi escolhida, substitui a g1.png
+        if novo_caminho_selecionado:
+            try:
+                nova_imagem = Image.open(novo_caminho_selecionado)
+                # O caminho final é sempre o da g1.png original
+                nova_imagem.save(caminho_g1_original, "PNG")
+                logger.log(f"Imagem g1.png do preset '{preset_atual}' foi substituída.")
+            except Exception as e:
+                messagebox.showerror("Erro ao Salvar Imagem", f"Não foi possível salvar a nova imagem g1.png: {e}")
+                return
+        
+        logger.log(f"Edição de g1 para '{preset_atual}' finalizada.")
+        editor_g1_window.destroy()
+        mudar_preset()
+
+    def fechar_sem_salvar():
+        """Função para o botão 'X' da janela."""
+        logger.log(f"Edição de g1 do preset '{preset_atual}' cancelada.")
+        editor_g1_window.destroy()
+
+    # --- Widgets da Janela de Edição ---
+    
     top_frame = tk.Frame(editor_g1_window)
     top_frame.pack(side="top", fill="x", padx=10, pady=10)
-
+    # Controles de cor...
     btn_escolher_cor = tk.Button(top_frame, text="Escolher cor", command=escolher_nova_cor_dialogo)
     btn_escolher_cor.pack(side="left")
-
     cor_atual = PRESETS[preset_atual]["color"]
     cor_preview_local = tk.Label(top_frame, bg=cor_atual, relief="solid", bd=1, width=4)
     cor_preview_local.pack(side="left", padx=5)
-
     hex_var = tk.StringVar(value=cor_atual)
     hex_entry = tk.Entry(top_frame, textvariable=hex_var, width=10)
     hex_entry.pack(side="left")
-
     hex_var.trace_add("write", on_hex_var_change)
 
     preview_frame = tk.Frame(editor_g1_window, relief="sunken", bd=2)
     preview_frame.pack(fill="both", expand=True, padx=10, pady=5)
-    canvas_preview = tk.Canvas(preview_frame, bg="gray")
-    canvas_preview.bind("<Configure>", lambda e: update_g1_preview(hex_var.get()))
-    canvas_preview.pack(fill="both", expand=True)
+    preview_canvas = tk.Canvas(preview_frame, bg="gray")
+    preview_canvas.pack(fill="both", expand=True)
 
-    btn_aplicar = tk.Button(editor_g1_window, text="Aplicar e Fechar", command=aplicar_e_fechar)
-    btn_aplicar.pack(side="right", padx=10, pady=10)
+    bottom_frame = tk.Frame(editor_g1_window)
+    bottom_frame.pack(fill="x", padx=10, pady=(0, 10))
+
+    btn_aplicar = tk.Button(bottom_frame, text="Aplicar e Fechar", command=aplicar_e_fechar)
+    btn_aplicar.pack(side="right", padx=10)
     
+    center_frame = tk.Frame(bottom_frame)
+    center_frame.pack(expand=True)
+    btn_procurar = tk.Button(center_frame, text="Procurar Nova Imagem...", command=procurar_nova_imagem_g1)
+    btn_procurar.pack()
+
+    # --- Chamadas Iniciais e Binds ---
+    editor_g1_window.after(100, update_g1_preview) 
+    preview_canvas.bind("<Configure>", lambda e: update_g1_preview())
+    editor_g1_window.protocol("WM_DELETE_WINDOW", fechar_sem_salvar)
+
     logger.log(f"Janela de edição de cor aberta para o preset '{preset_atual}'.")
 
 def excluir_preset_selecionado():
@@ -313,74 +342,145 @@ def acao_excluir_imagem(caminho_da_imagem):
 def acao_editar_imagem(caminho_original):
     """
     Abre uma nova janela para substituir a imagem selecionada por uma nova.
-    A nova imagem será convertida para .png e renomeada para o nome da original.
+    VERSÃO FINAL com preview, aplicação manual e dimensionamento dinâmico.
     """
     
-    # --- Criação da Janela de Edição ---
+    # --- LÓGICA DE DIMENSIONAMENTO DA JANELA ---
+    try:
+        imagem_pil = Image.open(caminho_original)
+        img_w, img_h = imagem_pil.size
+        img_aspect_ratio = img_w / img_h
+    except Exception as e:
+        messagebox.showerror("Erro ao Abrir", f"Não foi possível ler a imagem original: {e}")
+        return
+
     editor_window = tk.Toplevel(janela)
     editor_window.title("Substituir Imagem")
-    editor_window.geometry("800x800")
-    editor_window.transient(janela) # Mantém a janela de edição na frente da principal
-    editor_window.grab_set() # Foca a interação nesta janela até que ela seja fechada
 
-    # --- Função interna para processar a substituição ---
-    def procurar_e_substituir():
-        # Abre o diálogo para o usuário escolher um novo arquivo
-        novo_caminho = filedialog.askopenfilename(
+    # Pega o tamanho da tela e define um limite (90%)
+    screen_w = editor_window.winfo_screenwidth()
+    screen_h = editor_window.winfo_screenheight()
+    max_win_w = int(screen_w * 0.9)
+    max_win_h = int(screen_h * 0.9)
+
+    # Estima o espaço dos controles
+    chrome_height = 120 
+    
+    # Calcula o tamanho inicial ideal, garantindo que não ultrapasse o limite da tela
+    window_h = min(img_h + chrome_height, max_win_h)
+    preview_h = window_h - chrome_height
+    preview_w = preview_h * img_aspect_ratio
+    window_w = int(preview_w + 40)
+
+    if window_w > max_win_w:
+        window_w = max_win_w
+        preview_w = window_w - 40
+        preview_h = preview_w / img_aspect_ratio
+        window_h = int(preview_h + chrome_height)
+
+    editor_window.minsize(500, 400)
+    editor_window.geometry(f"{window_w}x{window_h}")
+    editor_window.transient(janela)
+    editor_window.grab_set()
+
+    # --- O RESTANTE DA LÓGICA ---
+    novo_caminho_selecionado = None
+    canvas_image_id = None
+
+    def atualizar_preview():
+        nonlocal canvas_image_id
+        caminho_para_mostrar = novo_caminho_selecionado if novo_caminho_selecionado else caminho_original
+        try:
+            imagem_pil_preview = Image.open(caminho_para_mostrar)
+            canvas_w = preview_canvas.winfo_width()
+            canvas_h = preview_canvas.winfo_height()
+            if canvas_w <= 1 or canvas_h <= 1: return
+
+            prev_w, prev_h = imagem_pil_preview.size
+            prev_aspect_ratio = prev_w / prev_h
+            if canvas_w / canvas_h > prev_aspect_ratio:
+                new_h = canvas_h
+                new_w = int(new_h * prev_aspect_ratio)
+            else:
+                new_w = canvas_w
+                new_h = int(new_w / prev_aspect_ratio)
+            
+            img_resized = imagem_pil_preview.resize((new_w, new_h), Image.Resampling.LANCZOS)
+            img_tk = ImageTk.PhotoImage(img_resized)
+            
+            if canvas_image_id:
+                preview_canvas.delete(canvas_image_id)
+            
+            canvas_image_id = preview_canvas.create_image(canvas_w/2, canvas_h/2, image=img_tk, anchor="center")
+            preview_canvas.image = img_tk
+        except Exception as e:
+            print(f"Erro ao carregar preview: {e}")
+
+    def procurar_nova_imagem():
+        nonlocal novo_caminho_selecionado
+        caminho = filedialog.askopenfilename(
             title="Escolha a nova imagem",
             filetypes=[("Imagens", "*.png *.jpg *.jpeg *.bmp *.gif"), ("Todos os arquivos", "*.*")]
         )
+        if caminho:
+            novo_caminho_selecionado = caminho
+            logger.log(f"Nova imagem '{os.path.basename(caminho)}' selecionada para substituir '{os.path.basename(caminho_original)}'.")
+            atualizar_preview()
 
-        # Se o usuário não escolheu nada, encerra a função
-        if not novo_caminho:
-            logger.log(f"Substituição de '{os.path.basename(caminho_original)}' cancelada.")
+    def salvar_e_fechar():
+        if not novo_caminho_selecionado:
+            editor_window.destroy()
             return
-
         try:
-            # Pega o diretório e o nome do arquivo original (sem extensão)
             diretorio_preset = os.path.dirname(caminho_original)
             nome_original_sem_ext = os.path.splitext(os.path.basename(caminho_original))[0]
-            
-            # Define o caminho final para o novo arquivo. Ele terá o nome do antigo e a extensão .png
             caminho_final = os.path.join(diretorio_preset, f"{nome_original_sem_ext}.png")
-
-            # Abre a nova imagem com o Pillow
-            nova_imagem = Image.open(novo_caminho)
+            nova_imagem = Image.open(novo_caminho_selecionado)
             
-            # Remove o arquivo antigo
-            os.remove(caminho_original)
-            logger.log(f"Arquivo original '{os.path.basename(caminho_original)}' removido para substituição.")
+            if os.path.normpath(caminho_original) != os.path.normpath(caminho_final):
+                os.remove(caminho_original)
+                logger.log(f"Arquivo original '{os.path.basename(caminho_original)}' removido.")
 
-            # Salva a nova imagem no formato PNG no caminho final
-            # Se a imagem tiver um canal alfa (transparência), ele será preservado
             nova_imagem.save(caminho_final, "PNG")
             logger.log(f"Nova imagem salva como '{os.path.basename(caminho_final)}'.")
-
-            messagebox.showinfo("Sucesso", "Imagem substituída com sucesso!")
             
-            # Fecha a janela de edição e atualiza a galeria principal
+            # --- POPUP REMOVIDO ---
+            
             editor_window.destroy()
             mudar_preset()
-
         except Exception as e:
             messagebox.showerror("Erro na Substituição", f"Ocorreu um erro: {e}")
             logger.log(f"ERRO ao substituir imagem: {e}")
-            editor_window.destroy()
+
+    def fechar_sem_salvar():
+        logger.log(f"Edição de '{os.path.basename(caminho_original)}' cancelada pelo usuário.")
+        editor_window.destroy()
 
     # --- Widgets da Janela de Edição ---
     
-    # Espaço para visualização da imagem (atualmente vazio, como solicitado)
-    preview_frame = tk.Frame(editor_window, bg="black", height=600)
+    preview_frame = tk.Frame(editor_window, relief="sunken", bd=2)
     preview_frame.pack(fill="both", expand=True, padx=10, pady=10)
-    tk.Label(preview_frame, text="Área de preview (a ser implementada)", bg="black", fg="white").pack(pady=20)
+    preview_canvas = tk.Canvas(preview_frame, bg="gray")
+    preview_canvas.pack(fill="both", expand=True)
 
-    # Barra inferior com o botão
-    bottom_bar = tk.Frame(editor_window, height=50)
-    bottom_bar.pack(fill="x", padx=10, pady=10)
+    bottom_frame = tk.Frame(editor_window)
+    bottom_frame.pack(fill="x", padx=10, pady=(0, 10))
 
-    btn_procurar = tk.Button(bottom_bar, text="Procurar Novo Arquivo...", command=procurar_e_substituir)
-    btn_procurar.pack(pady=10)
+    # --- POSICIONAMENTO DOS BOTÕES CORRIGIDO ---
+    # Botão de aplicar vai para a direita
+    btn_aplicar = tk.Button(bottom_frame, text="Aplicar e Fechar", command=salvar_e_fechar)
+    btn_aplicar.pack(side="right", padx=10)
+    
+    # Botão de procurar fica no centro (usando expand=True em um frame pai)
+    center_frame = tk.Frame(bottom_frame)
+    center_frame.pack(expand=True)
+    btn_procurar = tk.Button(center_frame, text="Procurar Novo Arquivo...", command=procurar_nova_imagem)
+    btn_procurar.pack() # .pack() sem argumentos centraliza
 
+    # --- Chamadas Iniciais e Binds ---
+    editor_window.after(100, atualizar_preview) 
+    preview_canvas.bind("<Configure>", lambda e: atualizar_preview())
+    editor_window.protocol("WM_DELETE_WINDOW", fechar_sem_salvar)
     logger.log(f"Janela de edição aberta para o arquivo '{os.path.basename(caminho_original)}'.")
 
 def criar_botao_com_icone(master, icon_image_tk, background_image_tk=None, background_color=None, command=None, size=15):
