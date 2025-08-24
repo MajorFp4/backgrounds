@@ -45,7 +45,7 @@ imagens_atuais = []
 def abrir_janela_edicao_g1():
     """
     Abre uma janela personalizada para editar a cor e substituir a imagem de fundo g1.png.
-    VERSÃO FINAL com todas as funcionalidades.
+    VERSÃO COM ORDEM DE EXECUÇÃO CORRIGIDA.
     """
     preset_atual = preset_var.get()
     if preset_atual not in PRESETS:
@@ -64,7 +64,7 @@ def abrir_janela_edicao_g1():
     editor_g1_window = tk.Toplevel(janela)
     editor_g1_window.title(f"Editando Fundo (g1.png) - {preset_atual}")
     
-    # Lógica de dimensionamento da janela (mantida da versão anterior)
+    # Lógica de dimensionamento (mantida)
     screen_w = editor_g1_window.winfo_screenwidth()
     screen_h = editor_g1_window.winfo_screenheight()
     max_win_w = int(screen_w * 0.9)
@@ -86,25 +86,51 @@ def abrir_janela_edicao_g1():
 
     # --- Variáveis de Estado ---
     canvas_image_id = None
-    novo_caminho_selecionado = None # Para guardar o caminho da nova imagem g1
+    novo_caminho_selecionado = None
 
-    # --- Funções Internas ---
+    # --- CRIAÇÃO DOS WIDGETS (MOVIDA PARA CIMA) ---
+    
+    # Frame superior para os controles de cor
+    top_frame = tk.Frame(editor_g1_window)
+    top_frame.pack(side="top", fill="x", padx=10, pady=10)
+    btn_escolher_cor = tk.Button(top_frame, text="Escolher cor", command=lambda: escolher_nova_cor_dialogo())
+    btn_escolher_cor.pack(side="left")
+    cor_atual = PRESETS[preset_atual]["color"]
+    cor_preview_local = tk.Label(top_frame, bg=cor_atual, relief="solid", bd=1, width=4)
+    cor_preview_local.pack(side="left", padx=5)
+    hex_var = tk.StringVar(value=cor_atual)
+    hex_entry = tk.Entry(top_frame, textvariable=hex_var, width=10)
+    hex_entry.pack(side="left")
+
+    # Frame do preview
+    preview_frame = tk.Frame(editor_g1_window, relief="sunken", bd=2)
+    preview_frame.pack(fill="both", expand=True, padx=10, pady=5)
+    canvas_preview = tk.Canvas(preview_frame, bg="gray")
+    canvas_preview.pack(fill="both", expand=True)
+
+    # Frame inferior para os botões
+    bottom_frame = tk.Frame(editor_g1_window)
+    bottom_frame.pack(fill="x", padx=10, pady=(0, 10))
+    btn_aplicar = tk.Button(bottom_frame, text="Aplicar e Fechar", command=lambda: aplicar_e_fechar())
+    btn_aplicar.pack(side="right", padx=10)
+    center_frame = tk.Frame(bottom_frame)
+    center_frame.pack(expand=True)
+    btn_procurar = tk.Button(center_frame, text="Procurar Nova Imagem...", command=lambda: procurar_nova_imagem_g1())
+    btn_procurar.pack()
+
+    # --- FUNÇÕES INTERNAS (agora podem acessar os widgets com segurança) ---
 
     def update_g1_preview():
-        """Atualiza o canvas com a imagem (nova ou original) e a cor selecionada."""
         nonlocal canvas_image_id
-        
         caminho_base = novo_caminho_selecionado if novo_caminho_selecionado else caminho_g1_original
-        cor_atual = hex_var.get()
+        cor_atual_valida = hex_var.get()
 
         try:
             img_base = Image.open(caminho_base).convert("L")
-            img_colorida = ImageOps.colorize(img_base, black="black", white=cor_atual)
-
+            img_colorida = ImageOps.colorize(img_base, black="black", white=cor_atual_valida)
             canvas_w = canvas_preview.winfo_width()
             canvas_h = canvas_preview.winfo_height()
             if canvas_w <= 1 or canvas_h <= 1: return
-
             base_w, base_h = img_base.size
             base_aspect_ratio = base_w / base_h
             if canvas_w / canvas_h > base_aspect_ratio:
@@ -113,13 +139,10 @@ def abrir_janela_edicao_g1():
             else:
                 new_w = canvas_w
                 new_h = int(new_w / base_aspect_ratio)
-            
             img_resized = img_colorida.resize((new_w, new_h), Image.Resampling.LANCZOS)
             img_tk = ImageTk.PhotoImage(img_resized)
-            
             if canvas_image_id:
                 canvas_preview.delete(canvas_image_id)
-            
             canvas_image_id = canvas_preview.create_image(canvas_w/2, canvas_h/2, image=img_tk, anchor="center")
             canvas_preview.image = img_tk
         except Exception as e:
@@ -129,7 +152,7 @@ def abrir_janela_edicao_g1():
         cor_inserida = hex_var.get()
         if re.match(r'^#[0-9a-fA-F]{6}$', cor_inserida):
             cor_preview_local.config(bg=cor_inserida)
-            update_g1_preview() # A cor já está na hex_var, que é usada pelo update_g1_preview
+            update_g1_preview()
 
     def escolher_nova_cor_dialogo():
         cor_rgb, cor_hex = colorchooser.askcolor(title="Escolha uma cor")
@@ -137,12 +160,8 @@ def abrir_janela_edicao_g1():
             hex_var.set(cor_hex)
 
     def procurar_nova_imagem_g1():
-        """Procura uma nova imagem para substituir a g1.png."""
         nonlocal novo_caminho_selecionado
-        caminho = filedialog.askopenfilename(
-            title="Escolha a nova imagem de fundo (g1)",
-            filetypes=[("Imagens", "*.png *.jpg *.jpeg *.bmp *.gif"), ("Todos os arquivos", "*.*")]
-        )
+        caminho = filedialog.askopenfilename(title="Escolha a nova imagem de fundo (g1)", filetypes=[("Imagens", "*.png *.jpg *.jpeg *.bmp *.gif"), ("Todos os arquivos", "*.*")])
         if caminho:
             novo_caminho_selecionado = caminho
             logger.log(f"Nova imagem '{os.path.basename(caminho)}' selecionada para substituir g1.png.")
@@ -153,69 +172,31 @@ def abrir_janela_edicao_g1():
         if not re.match(r'^#[0-9a-fA-F]{6}$', cor_final):
             messagebox.showwarning("Cor Inválida", "A cor final inserida não é um código hexadecimal válido (ex: #1A2B3C).")
             return
-
-        # Salva a cor final
         if PRESETS[preset_atual]["color"] != cor_final:
             PRESETS[preset_atual]["color"] = cor_final
             salvar_presets(PRESETS, DATA_FILE)
             logger.log(f"Cor do preset '{preset_atual}' salva como {cor_final}.")
-
-        # Se uma nova imagem foi escolhida, substitui a g1.png
         if novo_caminho_selecionado:
             try:
                 nova_imagem = Image.open(novo_caminho_selecionado)
-                # O caminho final é sempre o da g1.png original
                 nova_imagem.save(caminho_g1_original, "PNG")
                 logger.log(f"Imagem g1.png do preset '{preset_atual}' foi substituída.")
             except Exception as e:
                 messagebox.showerror("Erro ao Salvar Imagem", f"Não foi possível salvar a nova imagem g1.png: {e}")
                 return
-        
         logger.log(f"Edição de g1 para '{preset_atual}' finalizada.")
         editor_g1_window.destroy()
         mudar_preset()
 
     def fechar_sem_salvar():
-        """Função para o botão 'X' da janela."""
         logger.log(f"Edição de g1 do preset '{preset_atual}' cancelada.")
         editor_g1_window.destroy()
 
-    # --- Widgets da Janela de Edição ---
-    
-    top_frame = tk.Frame(editor_g1_window)
-    top_frame.pack(side="top", fill="x", padx=10, pady=10)
-    # Controles de cor...
-    btn_escolher_cor = tk.Button(top_frame, text="Escolher cor", command=escolher_nova_cor_dialogo)
-    btn_escolher_cor.pack(side="left")
-    cor_atual = PRESETS[preset_atual]["color"]
-    cor_preview_local = tk.Label(top_frame, bg=cor_atual, relief="solid", bd=1, width=4)
-    cor_preview_local.pack(side="left", padx=5)
-    hex_var = tk.StringVar(value=cor_atual)
-    hex_entry = tk.Entry(top_frame, textvariable=hex_var, width=10)
-    hex_entry.pack(side="left")
+    # --- CHAMADAS FINAIS ---
     hex_var.trace_add("write", on_hex_var_change)
-
-    preview_frame = tk.Frame(editor_g1_window, relief="sunken", bd=2)
-    preview_frame.pack(fill="both", expand=True, padx=10, pady=5)
-    preview_canvas = tk.Canvas(preview_frame, bg="gray")
-    preview_canvas.pack(fill="both", expand=True)
-
-    bottom_frame = tk.Frame(editor_g1_window)
-    bottom_frame.pack(fill="x", padx=10, pady=(0, 10))
-
-    btn_aplicar = tk.Button(bottom_frame, text="Aplicar e Fechar", command=aplicar_e_fechar)
-    btn_aplicar.pack(side="right", padx=10)
-    
-    center_frame = tk.Frame(bottom_frame)
-    center_frame.pack(expand=True)
-    btn_procurar = tk.Button(center_frame, text="Procurar Nova Imagem...", command=procurar_nova_imagem_g1)
-    btn_procurar.pack()
-
-    # --- Chamadas Iniciais e Binds ---
-    editor_g1_window.after(100, update_g1_preview) 
-    preview_canvas.bind("<Configure>", lambda e: update_g1_preview())
+    canvas_preview.bind("<Configure>", lambda e: update_g1_preview())
     editor_g1_window.protocol("WM_DELETE_WINDOW", fechar_sem_salvar)
-
+    editor_g1_window.after(100, update_g1_preview) # Chama o preview inicial
     logger.log(f"Janela de edição de cor aberta para o preset '{preset_atual}'.")
 
 def excluir_preset_selecionado():
