@@ -10,7 +10,8 @@ from functions import (
     carregar_presets,
     salvar_presets,
     carregar_imagens,
-    carregar_g1_colorido
+    carregar_g1_colorido,
+    gerar_imagem_final
 )
 
 # --- CONFIGURAÇÕES GLOBAIS E CONSTANTES ---
@@ -631,30 +632,41 @@ def atualizar_galeria(imagens):
         widget.destroy()
 
     row, col = 0, 0
-    preset = preset_var.get()
+    preset_nome = preset_var.get()
     
-    if preset not in PRESETS: return
+    if preset_nome not in PRESETS: return
 
-    g1_base = carregar_g1_colorido(
-        PRESETS[preset]["code"], 
-        PRESETS[preset]["color"],
-        PRESETS[preset].get("opacidade", 0),
-        PRESETS[preset].get("no_color", False), 
-        BASE_DIR
-    ) if mostrar_fundo_var.get() else None
+    preset_info = PRESETS[preset_nome]
+
+    # Carrega a base do fundo uma vez, se a opção estiver marcada
+    g1_base_para_fundo = None
+    if mostrar_fundo_var.get():
+        caminho_g1 = os.path.join(BASE_DIR, preset_info["code"], "g1.png")
+        if os.path.exists(caminho_g1):
+            # Processa a g1 em tamanho real para usar como fundo
+            fundo_processado = gerar_imagem_final(preset_info, caminho_g1, BASE_DIR)
+            if fundo_processado:
+                # Redimensiona para o tamanho do thumbnail
+                g1_base_para_fundo = fundo_processado.resize((146, 96), Image.Resampling.LANCZOS)
+
 
     for nome, caminho in imagens:
         frame = tk.Frame(galeria_inner, width=150, height=100, bd=2, relief="solid")
         frame.grid(row=row, column=col, padx=5, pady=5)
         frame.grid_propagate(False)
 
-        imagem_principal_pil = Image.open(caminho).resize((146, 96)).convert("RGBA")
-        
-        final_pil = imagem_principal_pil
-        if g1_base:
-            fundo = g1_base.copy()
-            fundo.paste(imagem_principal_pil, (0, 0), imagem_principal_pil)
-            final_pil = fundo
+        # Se a imagem atual for a g1.png, o thumbnail dela é a própria base de fundo
+        if nome == "g1.png" and g1_base_para_fundo:
+            final_pil = g1_base_para_fundo
+        else:
+            # Para as outras imagens, carrega e as coloca sobre a base de fundo
+            imagem_principal_pil = Image.open(caminho).resize((146, 96)).convert("RGBA")
+            if g1_base_para_fundo:
+                fundo = g1_base_para_fundo.copy()
+                fundo.paste(imagem_principal_pil, (0, 0), imagem_principal_pil)
+                final_pil = fundo
+            else:
+                final_pil = imagem_principal_pil
 
         img_tk = ImageTk.PhotoImage(final_pil)
         canvas = tk.Canvas(frame, width=146, height=96, highlightthickness=0)
@@ -662,85 +674,41 @@ def atualizar_galeria(imagens):
         canvas.image = img_tk
         canvas.place(x=0, y=0)
 
-        # --- NOVA LÓGICA DE RECORTE PARA FUNDO DOS ÍCONES ---
-        
-        # Posições e tamanho dos botões
+        # Lógica dos botões de editar/excluir
         btn_size = 15
         pos_delete = (5, 5)
         pos_edit = (25, 5)
-
-        # Recorta o pedaço da imagem final que ficará atrás do botão de excluir
         bg_delete_pil = final_pil.crop((pos_delete[0], pos_delete[1], pos_delete[0] + btn_size, pos_delete[1] + btn_size))
         bg_delete_tk = ImageTk.PhotoImage(bg_delete_pil)
-        
-        # Recorta o pedaço da imagem final que ficará atrás do botão de editar
         bg_edit_pil = final_pil.crop((pos_edit[0], pos_edit[1], pos_edit[0] + btn_size, pos_edit[1] + btn_size))
         bg_edit_tk = ImageTk.PhotoImage(bg_edit_pil)
-        
-        # Guarda uma referência para as imagens de fundo para evitar que o Python as apague
         canvas.bg_delete = bg_delete_tk
         canvas.bg_edit = bg_edit_tk
-
-        # --- CRIAÇÃO DOS BOTÕES COM FUNDO PERSONALIZADO ---
-
-        # Botão para EXCLUIR a imagem
         comando_excluir = lambda c=caminho: acao_excluir_imagem(c)
-        botao_excluir = criar_botao_com_icone(
-            frame, 
-            background_image_tk=bg_delete_tk, 
-            icon_image_tk=icon_delete_tk, 
-            command=comando_excluir, 
-            size=btn_size
-        )
+        botao_excluir = criar_botao_com_icone(frame, icon_image_tk=icon_delete_tk, background_image_tk=bg_delete_tk, command=comando_excluir, size=btn_size)
         botao_excluir.place(x=pos_delete[0], y=pos_delete[1])
-
-        # --- LÓGICA DIFERENCIADA PARA O BOTÃO DE EDITAR ---
         if nome == "g1.png":
-            # Se a imagem for a g1.png, chama a nova janela de edição de cor
             comando_editar = lambda: abrir_janela_edicao_g1()
         else:
-            # Para todas as outras imagens, chama a janela de substituição
             comando_editar = lambda c=caminho: acao_editar_imagem(c)
-
-        # Botão para EDITAR a imagem (a criação é a mesma, só o comando muda)
-        botao_editar = criar_botao_com_icone(
-            frame, 
-            background_image_tk=bg_edit_tk, 
-            icon_image_tk=icon_edit_tk, 
-            command=comando_editar, 
-            size=btn_size
-        )
-        botao_editar.place(x=pos_edit[0], y=pos_edit[1])   
+        botao_editar = criar_botao_com_icone(frame, icon_image_tk=icon_edit_tk, background_image_tk=bg_edit_tk, command=comando_editar, size=btn_size)
+        botao_editar.place(x=pos_edit[0], y=pos_edit[1])
 
         col += 1
         if col >= 5:
             col, row = 0, row + 1
 
-     # --- Frame para adicionar nova imagem ---
+    # Frame de "Adicionar nova imagem"
     frame_add = tk.Frame(galeria_inner, width=150, height=100, bd=2, relief="solid", bg="#E5E5E5")
     frame_add.grid(row=row, column=col, padx=5, pady=5)
-    frame_add.grid_propagate(False) # Impede que o frame mude de tamanho
-
-    # Cria o ícone de "+" usando a função aprimorada
-    icon_add = criar_botao_com_icone(
-        frame_add,
-        icon_image_tk=icon_add_tk,
-        background_color="#E5E5E5", # Cor de fundo da janela
-        size=50 # Tamanho do ícone
-    )
-    # Posiciona o ícone no centro do frame
+    frame_add.grid_propagate(False)
+    icon_add = criar_botao_com_icone(frame_add, icon_image_tk=icon_add_tk, background_color="#E5E5E5", size=50)
     icon_add.place(relx=0.5, rely=0.4, anchor="center")
-
-    # Cria o label de texto
     label_add = tk.Label(frame_add, text="Adicionar nova\nimagem", bg="#E5E5E5", fg="black")
     label_add.place(relx=0.5, rely=0.8, anchor="center")
-    
-    # --- Adiciona a função de clique a TODOS os elementos ---
-    # Isso garante que clicar em qualquer lugar (no fundo, no ícone ou no texto) funcione.
     comando_clique = lambda e: abrir_janela_adicionar_imagem()
     frame_add.bind("<Button-1>", comando_clique)
     icon_add.bind("<Button-1>", comando_clique)
-    # Precisamos iterar sobre os filhos do canvas (o ícone em si) para adicionar o bind
     for child in icon_add.winfo_children():
         child.bind("<Button-1>", comando_clique)
     label_add.bind("<Button-1>", comando_clique)
@@ -769,8 +737,49 @@ def mudar_preset(event=None):
     atualizar_galeria(imagens_atuais)
 
 def gerar():
-    logger.log("Botão 'Gerar' foi clicado.")
-    print("Função gerar chamada.")
+    """
+    Pega o preset atual, processa todas as suas imagens e as salva na pasta 'output'.
+    """
+    preset_selecionado = preset_var.get()
+    if not preset_selecionado in PRESETS:
+        messagebox.showerror("Erro", "Selecione um preset válido para gerar as imagens.")
+        return
+
+    logger.log(f"Iniciando processo de geração para o preset '{preset_selecionado}'.")
+
+    # Garante que a pasta 'output' exista
+    pasta_output = os.path.join(BASE_DIR, "output")
+    os.makedirs(pasta_output, exist_ok=True)
+
+    # Pega as informações do preset
+    preset_info = PRESETS[preset_selecionado]
+    codigo_preset = preset_info["code"]
+    pasta_preset = os.path.join(BASE_DIR, codigo_preset)
+
+    # Lista todas as imagens no preset, exceto black.png
+    imagens_a_gerar = [f for f in os.listdir(pasta_preset) if f.lower().endswith((".png", ".jpg", ".jpeg")) and f.lower() != "black.png"]
+
+    total_imagens = len(imagens_a_gerar)
+    imagens_geradas = 0
+
+    for i, nome_imagem in enumerate(imagens_a_gerar):
+        print(f"Processando {i+1}/{total_imagens}: {nome_imagem}")
+        caminho_imagem = os.path.join(pasta_preset, nome_imagem)
+        
+        # Usa a nova função para processar a imagem em tamanho real
+        imagem_final = gerar_imagem_final(preset_info, caminho_imagem, BASE_DIR)
+
+        if imagem_final:
+            # Salva a imagem final na pasta 'output'
+            caminho_saida = os.path.join(pasta_output, nome_imagem)
+            try:
+                imagem_final.save(caminho_saida, "PNG")
+                imagens_geradas += 1
+            except Exception as e:
+                logger.log(f"ERRO ao salvar a imagem final '{nome_imagem}': {e}")
+    
+    logger.log(f"Geração concluída. {imagens_geradas}/{total_imagens} imagens salvas em '{pasta_output}'.")
+    messagebox.showinfo("Processo Concluído", f"{imagens_geradas} de {total_imagens} imagens foram geradas com sucesso na pasta 'output'.")
 
 def posicionar_direita(event=None):
     largura_janela = janela.winfo_width()

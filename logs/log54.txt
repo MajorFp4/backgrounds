@@ -1,0 +1,27 @@
+[2025-08-26 10:59:21] --- Sessão de log iniciada ---
+[2025-08-26 10:59:21] Preset alterado para: 'standard'.
+[2025-08-26 10:59:29] Preset alterado para: 'azur'.
+[2025-08-26 10:59:34] Iniciando processo de geração para o preset 'azur'.
+[2025-08-26 10:59:39] Geração concluída. 6/6 imagens salvas em 'C:\Users\Kaleo\backgrounds\output'.
+[2025-08-26 11:00:35] Iniciando exclusão do preset 'azur'.
+[2025-08-26 11:00:35] Pasta 'C:\Users\Kaleo\backgrounds\1AHTBL' excluída com sucesso.
+[2025-08-26 11:00:35] Atualizando a interface após a exclusão.
+[2025-08-26 11:00:35] Preset alterado para: 'standard'.
+[2025-08-26 11:00:41] Preset alterado para: 'Vermeio'.
+[2025-08-26 11:00:43] Iniciando exclusão do preset 'Vermeio'.
+[2025-08-26 11:00:43] Pasta 'C:\Users\Kaleo\backgrounds\M3TFQ8' excluída com sucesso.
+[2025-08-26 11:00:43] Atualizando a interface após a exclusão.
+[2025-08-26 11:00:43] Preset alterado para: 'standard'.
+[2025-08-26 11:00:47] Preset alterado para: 'test'.
+[2025-08-26 11:00:49] Iniciando exclusão do preset 'test'.
+[2025-08-26 11:00:49] Pasta 'C:\Users\Kaleo\backgrounds\JZLKNG' excluída com sucesso.
+[2025-08-26 11:00:49] Atualizando a interface após a exclusão.
+[2025-08-26 11:00:49] Preset alterado para: 'standard'.
+[2025-08-26 11:00:59] Imagem 'Demóstenes Neves.png' foi excluída com sucesso.
+[2025-08-26 11:00:59] Preset alterado para: 'standard'.
+[2025-08-26 11:01:06] Cor do preset 'standard' alterada para #ffffff.
+[2025-08-26 11:01:11] Janela de edição de cor aberta para o preset 'standard'.
+[2025-08-26 11:01:18] Opacidade do preset 'standard' salva como 0%.
+[2025-08-26 11:01:18] Edição de g1 para 'standard' finalizada.
+[2025-08-26 11:01:18] Preset alterado para: 'standard'.
+[2025-08-26 11:01:22] --- Sessão encerrada pelo usuário. Salvando logs finais. ---
