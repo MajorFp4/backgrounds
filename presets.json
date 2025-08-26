@@ -3,24 +3,28 @@
         "code": "standard",
         "color": "#80ffff",
         "mostrar_fundo": true,
-        "opacidade": 15
+        "opacidade": 15,
+        "no_color": false
     },
     "test": {
         "code": "JZLKNG",
         "color": "#d200d2",
         "mostrar_fundo": true,
-        "opacidade": 0
+        "opacidade": 0,
+        "no_color": false
     },
     "azur": {
         "code": "1AHTBL",
         "color": "#99ff00",
         "mostrar_fundo": true,
-        "opacidade": 0
+        "opacidade": 0,
+        "no_color": false
     },
     "Vermeio": {
         "code": "M3TFQ8",
         "color": "#6c0000",
         "mostrar_fundo": true,
-        "opacidade": 0
+        "opacidade": 0,
+        "no_color": false
     }
 }
