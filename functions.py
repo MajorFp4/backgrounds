@@ -27,7 +27,8 @@ def salvar_presets(presets_data, data_file):
 
 def carregar_imagens(preset_code, base_dir):
     """
-    Carrega os caminhos das imagens de um preset, garantindo que g1.png seja o primeiro item da lista.
+    Carrega os caminhos das imagens de um preset, garantindo que g1.png seja o primeiro
+    e que black.png seja ignorado.
     """
     pasta = os.path.join(base_dir, preset_code)
     if not os.path.exists(pasta):
@@ -35,22 +36,20 @@ def carregar_imagens(preset_code, base_dir):
     
     imagens = []
     
-    # --- NOVA LÓGICA ---
-    # 1. Procura por g1.png primeiro e o adiciona à lista se existir.
-    # Isso garante que ele será sempre o primeiro.
+    # Adiciona g1.png primeiro, se existir
     caminho_g1 = os.path.join(pasta, "g1.png")
     if os.path.exists(caminho_g1):
         imagens.append(("g1.png", caminho_g1))
     
-    # 2. Varre o diretório para adicionar as outras imagens, em ordem alfabética.
-    #    Usar sorted() garante uma ordem consistente para as outras imagens.
+    # Adiciona as outras imagens, ignorando g1.png e black.png
     for arquivo in sorted(os.listdir(pasta)):
-        # Garante que não vamos adicionar g1.png novamente (a checagem é case-insensitive)
-        if arquivo.lower() == "g1.png":
+        # --- CONDIÇÃO ADICIONADA AQUI ---
+        # Converte para minúsculas para a checagem não falhar
+        nome_arquivo_lower = arquivo.lower()
+        if nome_arquivo_lower == "g1.png" or nome_arquivo_lower == "black.png":
             continue
         
-        # Adiciona os outros arquivos de imagem válidos
-        if arquivo.lower().endswith((".png", ".jpg", ".jpeg")):
+        if nome_arquivo_lower.endswith((".png", ".jpg", ".jpeg")):
             caminho = os.path.join(pasta, arquivo)
             imagens.append((arquivo, caminho))
             

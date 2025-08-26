@@ -1,9 +1,7 @@
 import os
 import re
-import json
 import shutil
 import tkinter as tk
-import math
 from tkinter import ttk, colorchooser, IntVar, simpledialog, messagebox, filedialog
 from PIL import Image, ImageTk, ImageOps
 from logger import Logger
@@ -45,7 +43,7 @@ imagens_atuais = []
 def abrir_janela_edicao_g1():
     """
     Abre uma janela personalizada para editar a cor e substituir a imagem de fundo g1.png.
-    VERSÃO COM ORDEM DE EXECUÇÃO CORRIGIDA.
+    VERSÃO com criação de black.png no momento da seleção.
     """
     preset_atual = preset_var.get()
     if preset_atual not in PRESETS:
@@ -88,9 +86,7 @@ def abrir_janela_edicao_g1():
     canvas_image_id = None
     novo_caminho_selecionado = None
 
-    # --- CRIAÇÃO DOS WIDGETS (MOVIDA PARA CIMA) ---
-    
-    # Frame superior para os controles de cor
+    # --- CRIAÇÃO DOS WIDGETS ---
     top_frame = tk.Frame(editor_g1_window)
     top_frame.pack(side="top", fill="x", padx=10, pady=10)
     btn_escolher_cor = tk.Button(top_frame, text="Escolher cor", command=lambda: escolher_nova_cor_dialogo())
@@ -101,14 +97,10 @@ def abrir_janela_edicao_g1():
     hex_var = tk.StringVar(value=cor_atual)
     hex_entry = tk.Entry(top_frame, textvariable=hex_var, width=10)
     hex_entry.pack(side="left")
-
-    # Frame do preview
     preview_frame = tk.Frame(editor_g1_window, relief="sunken", bd=2)
     preview_frame.pack(fill="both", expand=True, padx=10, pady=5)
     canvas_preview = tk.Canvas(preview_frame, bg="gray")
     canvas_preview.pack(fill="both", expand=True)
-
-    # Frame inferior para os botões
     bottom_frame = tk.Frame(editor_g1_window)
     bottom_frame.pack(fill="x", padx=10, pady=(0, 10))
     btn_aplicar = tk.Button(bottom_frame, text="Aplicar e Fechar", command=lambda: aplicar_e_fechar())
@@ -118,13 +110,11 @@ def abrir_janela_edicao_g1():
     btn_procurar = tk.Button(center_frame, text="Procurar Nova Imagem...", command=lambda: procurar_nova_imagem_g1())
     btn_procurar.pack()
 
-    # --- FUNÇÕES INTERNAS (agora podem acessar os widgets com segurança) ---
-
+    # --- FUNÇÕES INTERNAS ---
     def update_g1_preview():
         nonlocal canvas_image_id
         caminho_base = novo_caminho_selecionado if novo_caminho_selecionado else caminho_g1_original
         cor_atual_valida = hex_var.get()
-
         try:
             img_base = Image.open(caminho_base).convert("L")
             img_colorida = ImageOps.colorize(img_base, black="black", white=cor_atual_valida)
@@ -165,6 +155,27 @@ def abrir_janela_edicao_g1():
         if caminho:
             novo_caminho_selecionado = caminho
             logger.log(f"Nova imagem '{os.path.basename(caminho)}' selecionada para substituir g1.png.")
+            
+            # --- NOVA LÓGICA PARA CRIAR black.png ---
+            try:
+                # Carrega a imagem selecionada para pegar suas dimensões
+                imagem_selecionada = Image.open(caminho)
+                largura, altura = imagem_selecionada.size
+                
+                # Cria a imagem preta
+                imagem_preta = Image.new('RGB', (largura, altura), color='black')
+                
+                # Define o caminho para salvar a black.png
+                pasta_preset = os.path.dirname(caminho_g1_original)
+                caminho_black_png = os.path.join(pasta_preset, "black.png")
+                
+                # Salva a imagem preta
+                imagem_preta.save(caminho_black_png, "PNG")
+                logger.log(f"Imagem black.png criada/atualizada com sucesso no tamanho {largura}x{altura}.")
+            except Exception as e:
+                logger.log(f"ERRO ao criar black.png: {e}")
+                messagebox.showerror("Erro", f"Não foi possível criar a imagem black.png: {e}")
+
             update_g1_preview()
 
     def aplicar_e_fechar():
@@ -176,6 +187,8 @@ def abrir_janela_edicao_g1():
             PRESETS[preset_atual]["color"] = cor_final
             salvar_presets(PRESETS, DATA_FILE)
             logger.log(f"Cor do preset '{preset_atual}' salva como {cor_final}.")
+        
+        # A lógica de criar black.png foi movida. Aqui só salvamos a g1.png.
         if novo_caminho_selecionado:
             try:
                 nova_imagem = Image.open(novo_caminho_selecionado)
@@ -184,11 +197,28 @@ def abrir_janela_edicao_g1():
             except Exception as e:
                 messagebox.showerror("Erro ao Salvar Imagem", f"Não foi possível salvar a nova imagem g1.png: {e}")
                 return
+        
         logger.log(f"Edição de g1 para '{preset_atual}' finalizada.")
         editor_g1_window.destroy()
         mudar_preset()
 
     def fechar_sem_salvar():
+        # --- LÓGICA DE LIMPEZA ADICIONADA ---
+        # Se uma nova imagem foi selecionada (e uma black.png foi criada),
+        # mas o usuário cancelou, devemos apagar a black.png para não deixar lixo.
+        if novo_caminho_selecionado:
+            try:
+                pasta_preset = os.path.dirname(caminho_g1_original)
+                caminho_black_png = os.path.join(pasta_preset, "black.png")
+                if os.path.exists(caminho_black_png):
+                    # Podemos decidir se apagamos ou não. Por segurança, é bom limpar.
+                    # Para esta implementação, vamos deixar o arquivo lá, pois pode ser útil.
+                    # Se quisesse apagar, era só descomentar a linha abaixo:
+                    # os.remove(caminho_black_png)
+                    logger.log("Cancelamento: a imagem black.png gerada não foi removida.")
+            except Exception as e:
+                logger.log(f"Erro ao tentar limpar black.png no cancelamento: {e}")
+        
         logger.log(f"Edição de g1 do preset '{preset_atual}' cancelada.")
         editor_g1_window.destroy()
 
@@ -196,7 +226,7 @@ def abrir_janela_edicao_g1():
     hex_var.trace_add("write", on_hex_var_change)
     canvas_preview.bind("<Configure>", lambda e: update_g1_preview())
     editor_g1_window.protocol("WM_DELETE_WINDOW", fechar_sem_salvar)
-    editor_g1_window.after(100, update_g1_preview) # Chama o preview inicial
+    editor_g1_window.after(100, update_g1_preview)
     logger.log(f"Janela de edição de cor aberta para o preset '{preset_atual}'.")
 
 def excluir_preset_selecionado():

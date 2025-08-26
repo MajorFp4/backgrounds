@@ -1,0 +1,14 @@
+[2025-08-26 09:33:02] --- Sessão de log iniciada ---
+[2025-08-26 09:33:02] Preset alterado para: 'standard'.
+[2025-08-26 09:33:05] Janela de edição de cor aberta para o preset 'standard'.
+[2025-08-26 09:33:12] Edição de g1 do preset 'standard' cancelada.
+[2025-08-26 09:33:19] Preset alterado para: 'azur'.
+[2025-08-26 09:33:21] Janela de edição de cor aberta para o preset 'azur'.
+[2025-08-26 09:34:20] Nova imagem 'Unciv files.png' selecionada para substituir g1.png.
+[2025-08-26 09:34:20] Imagem black.png criada/atualizada com sucesso no tamanho 1919x1079.
+[2025-08-26 09:34:44] Nova imagem 'g1.png' selecionada para substituir g1.png.
+[2025-08-26 09:34:44] Imagem black.png criada/atualizada com sucesso no tamanho 2560x1440.
+[2025-08-26 09:34:47] Imagem g1.png do preset 'azur' foi substituída.
+[2025-08-26 09:34:47] Edição de g1 para 'azur' finalizada.
+[2025-08-26 09:34:47] Preset alterado para: 'azur'.
+[2025-08-26 09:35:18] --- Sessão encerrada pelo usuário. Salvando logs finais. ---
