@@ -42,14 +42,15 @@ imagens_atuais = []
 
 def abrir_janela_edicao_g1():
     """
-    Abre uma janela personalizada para editar a cor e substituir a imagem de fundo g1.png.
-    VERSÃO com criação de black.png no momento da seleção.
+    Abre uma janela personalizada para editar o fundo g1.png.
+    VERSÃO OTIMIZADA com cache de imagem para um slider fluido.
     """
     preset_atual = preset_var.get()
     if preset_atual not in PRESETS:
         return
 
     caminho_g1_original = os.path.join(BASE_DIR, PRESETS[preset_atual]["code"], "g1.png")
+    caminho_black_png = os.path.join(BASE_DIR, PRESETS[preset_atual]["code"], "black.png")
 
     try:
         imagem_g1_pil = Image.open(caminho_g1_original)
@@ -77,14 +78,16 @@ def abrir_janela_edicao_g1():
         preview_w = window_w - 40
         preview_h = preview_w / img_aspect_ratio
         window_h = int(preview_h + chrome_height)
-    editor_g1_window.minsize(400, 300)
+    editor_g1_window.minsize(500, 400)
     editor_g1_window.geometry(f"{window_w}x{window_h}")
     editor_g1_window.transient(janela)
     editor_g1_window.grab_set()
 
-    # --- Variáveis de Estado ---
+    # --- Variáveis de Estado e CACHE ---
     canvas_image_id = None
     novo_caminho_selecionado = None
+    cached_colorized_g1 = None # Cache para a imagem g1 colorida
+    cached_black_img = None    # Cache para a imagem black.png
 
     # --- CRIAÇÃO DOS WIDGETS ---
     top_frame = tk.Frame(editor_g1_window)
@@ -97,6 +100,12 @@ def abrir_janela_edicao_g1():
     hex_var = tk.StringVar(value=cor_atual)
     hex_entry = tk.Entry(top_frame, textvariable=hex_var, width=10)
     hex_entry.pack(side="left")
+    opacidade_atual = PRESETS[preset_atual].get("opacidade", 0)
+    opacidade_var = tk.IntVar(value=opacidade_atual)
+    slider = tk.Scale(top_frame, from_=0, to=100, orient="horizontal", variable=opacidade_var, showvalue=0, length=150)
+    slider.pack(side="left", padx=(20, 0))
+    opacidade_entry = tk.Entry(top_frame, textvariable=opacidade_var, width=5)
+    opacidade_entry.pack(side="left", padx=5)
     preview_frame = tk.Frame(editor_g1_window, relief="sunken", bd=2)
     preview_frame.pack(fill="both", expand=True, padx=10, pady=5)
     canvas_preview = tk.Canvas(preview_frame, bg="gray")
@@ -110,39 +119,73 @@ def abrir_janela_edicao_g1():
     btn_procurar = tk.Button(center_frame, text="Procurar Nova Imagem...", command=lambda: procurar_nova_imagem_g1())
     btn_procurar.pack()
 
-    # --- FUNÇÕES INTERNAS ---
-    def update_g1_preview():
-        nonlocal canvas_image_id
+    # --- FUNÇÕES INTERNAS OTIMIZADAS ---
+
+    def regenerate_caches():
+        """Função PESADA: Carrega, colore e prepara as imagens para o cache."""
+        nonlocal cached_colorized_g1, cached_black_img
         caminho_base = novo_caminho_selecionado if novo_caminho_selecionado else caminho_g1_original
-        cor_atual_valida = hex_var.get()
+        cor_valida = hex_var.get()
         try:
             img_base = Image.open(caminho_base).convert("L")
-            img_colorida = ImageOps.colorize(img_base, black="black", white=cor_atual_valida)
-            canvas_w = canvas_preview.winfo_width()
-            canvas_h = canvas_preview.winfo_height()
-            if canvas_w <= 1 or canvas_h <= 1: return
-            base_w, base_h = img_base.size
-            base_aspect_ratio = base_w / base_h
-            if canvas_w / canvas_h > base_aspect_ratio:
-                new_h = canvas_h
-                new_w = int(new_h * base_aspect_ratio)
+            cached_colorized_g1 = ImageOps.colorize(img_base, black="black", white=cor_valida).convert("RGBA")
+            if os.path.exists(caminho_black_png):
+                cached_black_img = Image.open(caminho_black_png).convert("RGBA")
+                if cached_black_img.size != cached_colorized_g1.size:
+                    cached_black_img = cached_black_img.resize(cached_colorized_g1.size, Image.Resampling.LANCZOS)
             else:
-                new_w = canvas_w
-                new_h = int(new_w / base_aspect_ratio)
-            img_resized = img_colorida.resize((new_w, new_h), Image.Resampling.LANCZOS)
-            img_tk = ImageTk.PhotoImage(img_resized)
-            if canvas_image_id:
-                canvas_preview.delete(canvas_image_id)
-            canvas_image_id = canvas_preview.create_image(canvas_w/2, canvas_h/2, image=img_tk, anchor="center")
-            canvas_preview.image = img_tk
+                cached_black_img = Image.new("RGBA", cached_colorized_g1.size, (0, 0, 0, 255))
         except Exception as e:
-            print(f"Erro ao atualizar preview g1: {e}")
+            print(f"Erro ao regenerar cache de imagens: {e}")
+        update_g1_preview() # Atualiza o preview depois de criar o cache
+
+    def update_g1_preview():
+        """Função LEVE: Usa as imagens em cache para atualizar o preview rapidamente."""
+        nonlocal canvas_image_id
+        if not cached_colorized_g1: return
+        
+        opacidade_percent = opacidade_var.get()
+        
+        if opacidade_percent > 0:
+            alpha = opacidade_percent / 100.0
+            img_final = Image.blend(cached_colorized_g1, cached_black_img, alpha)
+        else:
+            img_final = cached_colorized_g1
+
+        canvas_w = canvas_preview.winfo_width()
+        canvas_h = canvas_preview.winfo_height()
+        if canvas_w <= 1 or canvas_h <= 1: return
+        
+        final_w, final_h = img_final.size
+        final_aspect_ratio = final_w / final_h
+        if canvas_w / canvas_h > final_aspect_ratio:
+            new_h = canvas_h
+            new_w = int(new_h * final_aspect_ratio)
+        else:
+            new_w = canvas_w
+            new_h = int(new_w / final_aspect_ratio)
+            
+        img_resized = img_final.resize((new_w, new_h), Image.Resampling.LANCZOS)
+        img_tk = ImageTk.PhotoImage(img_resized)
+        if canvas_image_id:
+            canvas_preview.delete(canvas_image_id)
+        canvas_image_id = canvas_preview.create_image(canvas_w/2, canvas_h/2, image=img_tk, anchor="center")
+        canvas_preview.image = img_tk
 
     def on_hex_var_change(*args):
         cor_inserida = hex_var.get()
         if re.match(r'^#[0-9a-fA-F]{6}$', cor_inserida):
             cor_preview_local.config(bg=cor_inserida)
-            update_g1_preview()
+            regenerate_caches() # Operação pesada, só quando a cor muda
+
+    def on_opacity_change(*args):
+        try:
+            valor = opacidade_var.get()
+            if valor < 0: opacidade_var.set(0)
+            if valor > 100: opacidade_var.set(100)
+            update_g1_preview() # Operação leve, chamada diretamente
+        except tk.TclError:
+            pass
 
     def escolher_nova_cor_dialogo():
         cor_rgb, cor_hex = colorchooser.askcolor(title="Escolha uma cor")
@@ -155,28 +198,18 @@ def abrir_janela_edicao_g1():
         if caminho:
             novo_caminho_selecionado = caminho
             logger.log(f"Nova imagem '{os.path.basename(caminho)}' selecionada para substituir g1.png.")
-            
-            # --- NOVA LÓGICA PARA CRIAR black.png ---
             try:
-                # Carrega a imagem selecionada para pegar suas dimensões
                 imagem_selecionada = Image.open(caminho)
                 largura, altura = imagem_selecionada.size
-                
-                # Cria a imagem preta
                 imagem_preta = Image.new('RGB', (largura, altura), color='black')
-                
-                # Define o caminho para salvar a black.png
                 pasta_preset = os.path.dirname(caminho_g1_original)
                 caminho_black_png = os.path.join(pasta_preset, "black.png")
-                
-                # Salva a imagem preta
                 imagem_preta.save(caminho_black_png, "PNG")
                 logger.log(f"Imagem black.png criada/atualizada com sucesso no tamanho {largura}x{altura}.")
             except Exception as e:
                 logger.log(f"ERRO ao criar black.png: {e}")
                 messagebox.showerror("Erro", f"Não foi possível criar a imagem black.png: {e}")
-
-            update_g1_preview()
+            regenerate_caches() # Operação pesada, só quando a imagem muda
 
     def aplicar_e_fechar():
         cor_final = hex_var.get()
@@ -187,8 +220,11 @@ def abrir_janela_edicao_g1():
             PRESETS[preset_atual]["color"] = cor_final
             salvar_presets(PRESETS, DATA_FILE)
             logger.log(f"Cor do preset '{preset_atual}' salva como {cor_final}.")
-        
-        # A lógica de criar black.png foi movida. Aqui só salvamos a g1.png.
+        opacidade_final = opacidade_var.get()
+        if PRESETS[preset_atual].get("opacidade", 0) != opacidade_final:
+            PRESETS[preset_atual]["opacidade"] = opacidade_final
+            salvar_presets(PRESETS, DATA_FILE)
+            logger.log(f"Opacidade do preset '{preset_atual}' salva como {opacidade_final}%.")
         if novo_caminho_selecionado:
             try:
                 nova_imagem = Image.open(novo_caminho_selecionado)
@@ -197,36 +233,20 @@ def abrir_janela_edicao_g1():
             except Exception as e:
                 messagebox.showerror("Erro ao Salvar Imagem", f"Não foi possível salvar a nova imagem g1.png: {e}")
                 return
-        
         logger.log(f"Edição de g1 para '{preset_atual}' finalizada.")
         editor_g1_window.destroy()
         mudar_preset()
 
     def fechar_sem_salvar():
-        # --- LÓGICA DE LIMPEZA ADICIONADA ---
-        # Se uma nova imagem foi selecionada (e uma black.png foi criada),
-        # mas o usuário cancelou, devemos apagar a black.png para não deixar lixo.
-        if novo_caminho_selecionado:
-            try:
-                pasta_preset = os.path.dirname(caminho_g1_original)
-                caminho_black_png = os.path.join(pasta_preset, "black.png")
-                if os.path.exists(caminho_black_png):
-                    # Podemos decidir se apagamos ou não. Por segurança, é bom limpar.
-                    # Para esta implementação, vamos deixar o arquivo lá, pois pode ser útil.
-                    # Se quisesse apagar, era só descomentar a linha abaixo:
-                    # os.remove(caminho_black_png)
-                    logger.log("Cancelamento: a imagem black.png gerada não foi removida.")
-            except Exception as e:
-                logger.log(f"Erro ao tentar limpar black.png no cancelamento: {e}")
-        
         logger.log(f"Edição de g1 do preset '{preset_atual}' cancelada.")
         editor_g1_window.destroy()
 
     # --- CHAMADAS FINAIS ---
     hex_var.trace_add("write", on_hex_var_change)
-    canvas_preview.bind("<Configure>", lambda e: update_g1_preview())
+    opacidade_var.trace_add("write", on_opacity_change)
+    canvas_preview.bind("<Configure>", lambda e: regenerate_caches())
     editor_g1_window.protocol("WM_DELETE_WINDOW", fechar_sem_salvar)
-    editor_g1_window.after(100, update_g1_preview)
+    editor_g1_window.after(100, regenerate_caches) # Gera o cache inicial
     logger.log(f"Janela de edição de cor aberta para o preset '{preset_atual}'.")
 
 def excluir_preset_selecionado():
@@ -590,7 +610,8 @@ def atualizar_galeria(imagens):
 
     g1_base = carregar_g1_colorido(
         PRESETS[preset]["code"], 
-        PRESETS[preset]["color"], 
+        PRESETS[preset]["color"],
+        PRESETS[preset].get("opacidade", 0), 
         BASE_DIR
     ) if mostrar_fundo_var.get() else None
 
