@@ -1,5 +1,0 @@
-[2025-08-26 10:39:43] --- Sessão de log iniciada ---
-[2025-08-26 10:39:43] Preset alterado para: 'standard'.
-[2025-08-26 10:40:01] Janela de edição de cor aberta para o preset 'standard'.
-[2025-08-26 10:40:05] Edição de g1 do preset 'standard' cancelada.
-[2025-08-26 10:40:07] --- Sessão encerrada pelo usuário. Salvando logs finais. ---

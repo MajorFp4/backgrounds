@@ -1,5 +1,0 @@
-[2025-08-20 19:05:07] --- Sessão de log iniciada ---
-[2025-08-20 19:05:07] Preset alterado para: 'standard'.
-[2025-08-20 19:05:16] Preset alterado para: 'Desbravadores'.
-[2025-08-20 19:05:18] Preset alterado para: 'Vermelho'.
-[2025-08-20 19:05:25] --- Sessão encerrada pelo usuário. Salvando logs finais. ---

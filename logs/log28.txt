@@ -1,8 +1,0 @@
-[2025-08-23 11:35:51] --- Sessão de log iniciada ---
-[2025-08-23 11:35:51] Preset alterado para: 'standard'.
-[2025-08-23 11:35:56] Janela de edição aberta para o arquivo 'Demóstenes Neves.png'.
-[2025-08-23 11:35:59] Janela de edição de cor aberta para o preset 'standard'.
-[2025-08-23 11:36:02] Janela de edição aberta para o arquivo 'especial.png'.
-[2025-08-23 11:36:04] Janela de edição aberta para o arquivo 'intercessao.png'.
-[2025-08-23 11:36:07] Janela de edição de cor aberta para o preset 'standard'.
-[2025-08-23 11:36:09] --- Sessão encerrada pelo usuário. Salvando logs finais. ---

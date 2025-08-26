@@ -1,4 +1,0 @@
-[2025-08-23 11:19:14] --- Sessão de log iniciada ---
-[2025-08-23 11:19:14] Preset alterado para: 'standard'.
-[2025-08-23 11:19:39] Janela de edição aberta para o arquivo 'Demóstenes Neves.png'.
-[2025-08-23 11:19:41] --- Sessão encerrada pelo usuário. Salvando logs finais. ---

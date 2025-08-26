@@ -1,7 +1,0 @@
-[2025-08-20 20:33:12] --- Sessão de log iniciada ---
-[2025-08-20 20:33:12] Preset alterado para: 'standard'.
-[2025-08-20 20:33:26] Cor do preset 'standard' atualizada para #80ff80 via entrada de texto.
-[2025-08-20 20:33:35] Cor do preset 'standard' atualizada para #400080 via entrada de texto.
-[2025-08-20 20:34:24] Cor do preset 'standard' atualizada para #80ffff via entrada de texto.
-[2025-08-20 20:35:51] Cor do preset 'standard' atualizada para #0000ff via entrada de texto.
-[2025-08-20 20:36:38] --- Sessão encerrada pelo usuário. Salvando logs finais. ---
